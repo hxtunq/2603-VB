@@ -1,0 +1,1 @@
+FINAL_BAM=results/preprocessing/SIMULATED_SAMPLE_chr22_final.bam

@@ -1,0 +1,32 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(ComplexHeatmap)
+library(UpSetR)
+library(data.table)
+```
+
+```{r}
+callset_long  <- fread("upset_long_callset.csv", header=FALSE, col.names=c("set","id"))
+baseline_long <- fread("upset_long_baseline.csv", header=FALSE, col.names=c("set","id"))
+```
+
+```{r}
+to_matrix <- function(dt) {
+  dt <- unique(dt)
+  mat <- dcast(dt, id ~ set, fun.aggregate=length, value.var="set")
+  sets <- setdiff(names(mat), "id")
+  mat[, (sets) := lapply(.SD, function(x) as.integer(x > 0)), .SDcols=sets]
+  list(mat=mat, sets=sets)
+}
+
+x1 <- to_matrix(callset_long)
+upset(x1$mat, sets=x1$sets, order.by="freq", nintersects=40)
+
+x2 <- to_matrix(baseline_long)
+upset(x2$mat, sets=x2$sets, order.by="freq", nintersects=40)
+```
