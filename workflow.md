@@ -185,52 +185,10 @@ tabix -p vcf simulated/SIMULATED_SAMPLE_chr22_truth.vcf.gz
 
 Output: `data/simulated/SIMULATED_SAMPLE_chr22_truth.vcf.gz` (+`.tbi`) — truth VCF chứa toàn bộ SNP + INDEL
 
-#### 2.5. Tạo file fastq giả lập bằng ART Illumina — Multi-coverage
-
-Tạo nhiều mức coverage khác nhau từ CÙNG MỘT mutated genome:
-- **WGS coverage:** 10x, 20x, 30x, 50x (tương tự GIAB WGS 22–37x)
-- **WES coverage:** 100x, 200x (tương tự GIAB WES 183–249x, đánh giá trên exome BED)
-
-```bash
-# pwd: variant-benchmarking/data
-
-SIM_DIR="simulated"
-PREFIX="SIMULATED_SAMPLE_chr22"
-MUTATED_FASTA="${SIM_DIR}/${PREFIX}.simseq.genome.fa"
-
-# Multi-coverage loop
-for COV in 10 20 30 50 100 200; do
-  echo "=== Generating ${COV}x coverage ==="
-
-  art_illumina \
-      -ss HS25 \
-      -i "${MUTATED_FASTA}" \
-      -p \
-      -l 150 \
-      -f ${COV} \
-      -m 350 \
-      -s 50 \
-      -rs 42 \
-      -o "${SIM_DIR}/${PREFIX}_${COV}x_" \
-      -na
-
-  # đổi tên và nén
-  mv "${SIM_DIR}/${PREFIX}_${COV}x_1.fq" "${SIM_DIR}/${PREFIX}_${COV}x_R1.fastq"
-  mv "${SIM_DIR}/${PREFIX}_${COV}x_2.fq" "${SIM_DIR}/${PREFIX}_${COV}x_R2.fastq"
-  gzip "${SIM_DIR}/${PREFIX}_${COV}x_R1.fastq"
-  gzip "${SIM_DIR}/${PREFIX}_${COV}x_R2.fastq"
-
-  echo "Done: ${SIM_DIR}/${PREFIX}_${COV}x_R{1,2}.fastq.gz"
-done
-```
-
-Output (per coverage level):
-- `data/simulated/SIMULATED_SAMPLE_chr22_{COV}x_R1.fastq.gz` — paired-end read 1
-- `data/simulated/SIMULATED_SAMPLE_chr22_{COV}x_R2.fastq.gz` — paired-end read 2
-
-#### 2.6. Download BED files cho exome targets và stratification
+#### 2.5. Download BED files cho exome targets và stratification
 
 Lấy từ AstraZeneca-NGS reference_data (hg38), extract chr22.
+**Phải chạy trước ART-Illumina** vì WES simulation cần exome BED để extract vùng target.
 
 ```bash
 # pwd: variant-benchmarking/data/reference
@@ -276,6 +234,106 @@ Output:
 - `data/reference/umap_k100_mappability.chr22.bed.gz` — low-mappability regions chr22
 - `data/reference/stratification_chr22.tsv` — stratification file cho hap.py
 
+#### 2.6. Tạo file fastq giả lập bằng ART Illumina — WGS
+
+Tạo reads WGS từ **toàn bộ** mutated genome (chr22 ~50Mb):
+- **WGS coverage:** 10x, 20x, 30x, 50x (tương tự GIAB WGS 22–37x)
+
+```bash
+# pwd: variant-benchmarking/data
+
+SIM_DIR="simulated"
+PREFIX="SIMULATED_SAMPLE_chr22"
+MUTATED_FASTA="${SIM_DIR}/${PREFIX}.simseq.genome.fa"
+
+# WGS: coverage thấp-trung bình, chạy trên toàn bộ chr22
+for COV in 10 20 30 50; do
+  echo "=== WGS: Generating ${COV}x coverage ==="
+
+  art_illumina \
+      -ss HS25 \
+      -i "${MUTATED_FASTA}" \
+      -p \
+      -l 150 \
+      -f ${COV} \
+      -m 350 \
+      -s 50 \
+      -rs 42 \
+      -o "${SIM_DIR}/${PREFIX}_${COV}x_" \
+      -na
+
+  # đổi tên và nén
+  mv "${SIM_DIR}/${PREFIX}_${COV}x_1.fq" "${SIM_DIR}/${PREFIX}_${COV}x_R1.fastq"
+  mv "${SIM_DIR}/${PREFIX}_${COV}x_2.fq" "${SIM_DIR}/${PREFIX}_${COV}x_R2.fastq"
+  gzip "${SIM_DIR}/${PREFIX}_${COV}x_R1.fastq"
+  gzip "${SIM_DIR}/${PREFIX}_${COV}x_R2.fastq"
+
+  echo "Done: ${SIM_DIR}/${PREFIX}_${COV}x_R{1,2}.fastq.gz"
+done
+```
+
+Output (per coverage level):
+- `data/simulated/SIMULATED_SAMPLE_chr22_{COV}x_R1.fastq.gz` — paired-end read 1
+- `data/simulated/SIMULATED_SAMPLE_chr22_{COV}x_R2.fastq.gz` — paired-end read 2
+
+#### 2.7. Tạo file fastq giả lập bằng ART Illumina — WES
+
+Tạo reads WES chỉ từ **vùng exome** (~1-2Mb trên chr22):
+- **WES coverage:** 100x, 200x (tương tự GIAB WES 183–249x)
+
+> **Lưu ý:** Dùng `bedtools getfasta` để extract chỉ vùng exome từ mutated genome
+> trước khi cho vào ART. Nhờ đó 200x chỉ cover ~1-2Mb thay vì ~50Mb → tiết kiệm
+> ~25-50x dung lượng và thời gian. Reads sau khi align (BWA-MEM) vẫn map lên toàn
+> bộ chr22, nhưng coverage chỉ cao ở vùng exome → đúng pattern WES thực tế.
+
+```bash
+# pwd: variant-benchmarking/data
+
+SIM_DIR="simulated"
+PREFIX="SIMULATED_SAMPLE_chr22"
+MUTATED_FASTA="${SIM_DIR}/${PREFIX}.simseq.genome.fa"
+EXOME_BED="reference/Exome-Agilent_V6.chr22.bed"
+
+# Index mutated genome cho bedtools
+samtools faidx "${MUTATED_FASTA}"
+
+# Extract chỉ vùng exome từ mutated genome
+bedtools getfasta \
+    -fi "${MUTATED_FASTA}" \
+    -bed "${EXOME_BED}" \
+    -fo "${SIM_DIR}/${PREFIX}_exome.fa"
+
+# WES: coverage cao, chỉ trên vùng exome
+for COV in 100 200; do
+  echo "=== WES: Generating ${COV}x coverage ==="
+
+  art_illumina \
+      -ss HS25 \
+      -i "${SIM_DIR}/${PREFIX}_exome.fa" \
+      -p \
+      -l 150 \
+      -f ${COV} \
+      -m 350 \
+      -s 50 \
+      -rs 42 \
+      -o "${SIM_DIR}/${PREFIX}_${COV}x_wes_" \
+      -na
+
+  # đổi tên và nén
+  mv "${SIM_DIR}/${PREFIX}_${COV}x_wes_1.fq" "${SIM_DIR}/${PREFIX}_${COV}x_wes_R1.fastq"
+  mv "${SIM_DIR}/${PREFIX}_${COV}x_wes_2.fq" "${SIM_DIR}/${PREFIX}_${COV}x_wes_R2.fastq"
+  gzip "${SIM_DIR}/${PREFIX}_${COV}x_wes_R1.fastq"
+  gzip "${SIM_DIR}/${PREFIX}_${COV}x_wes_R2.fastq"
+
+  echo "Done: ${SIM_DIR}/${PREFIX}_${COV}x_wes_R{1,2}.fastq.gz"
+done
+```
+
+Output:
+- `data/simulated/SIMULATED_SAMPLE_chr22_exome.fa` — mutated genome chỉ vùng exome
+- `data/simulated/SIMULATED_SAMPLE_chr22_{COV}x_wes_R1.fastq.gz` — WES paired-end read 1
+- `data/simulated/SIMULATED_SAMPLE_chr22_{COV}x_wes_R2.fastq.gz` — WES paired-end read 2
+
 ### Phần III. Tiền xử lý dữ liệu cho công đoạn gọi biến thể — Multi-coverage
 
 Theo paper (Barbitoff et al. 2022), preprocessing chung cho **tất cả callers** chỉ gồm:
@@ -286,7 +344,7 @@ Theo paper (Barbitoff et al. 2022), preprocessing chung cho **tất cả callers
 > Các caller khác (DeepVariant, Strelka2, FreeBayes, DNAscope) dùng trực tiếp **dedup BAM** mà không cần BQSR.  
 > BQSR đã được tích hợp sẵn trong script `pipelines/03_call_hc.sh`.
 
-Chạy lặp cho **mỗi mức coverage**:
+Chạy lặp cho **mỗi mức coverage**, chia thành WGS và WES:
 
 #### 3.1 BWA-MEM alignment + sort
 
@@ -296,8 +354,9 @@ Chạy lặp cho **mỗi mức coverage**:
 PREFIX="SIMULATED_SAMPLE_chr22"
 REF="data/reference/chr22.fa"
 
-for COV in 10 20 30 50 100 200; do
-  echo "=== BWA-MEM: ${COV}x ==="
+# === WGS (10x, 20x, 30x, 50x) ===
+for COV in 10 20 30 50; do
+  echo "=== BWA-MEM WGS: ${COV}x ==="
 
   R1="data/simulated/${PREFIX}_${COV}x_R1.fastq.gz"
   R2="data/simulated/${PREFIX}_${COV}x_R2.fastq.gz"
@@ -312,6 +371,24 @@ for COV in 10 20 30 50 100 200; do
 
   samtools index "${OUTDIR}/${PREFIX}_aligned.bam"
 done
+
+# === WES (100x, 200x) — reads từ vùng exome, align lên toàn bộ chr22 ===
+for COV in 100 200; do
+  echo "=== BWA-MEM WES: ${COV}x ==="
+
+  R1="data/simulated/${PREFIX}_${COV}x_wes_R1.fastq.gz"
+  R2="data/simulated/${PREFIX}_${COV}x_wes_R2.fastq.gz"
+  OUTDIR="results/preprocessing/${COV}x_wes"
+  mkdir -p "${OUTDIR}" "logs/${COV}x_wes"
+
+  bwa mem -t 4 -M \
+    -R "@RG\tID:${PREFIX}_${COV}x_wes\tSM:SIMULATED_SAMPLE\tPL:ILLUMINA\tLB:lib1\tPU:unit1" \
+    "${REF}" "${R1}" "${R2}" \
+    2> "logs/${COV}x_wes/bwa_mem.log" | \
+    samtools sort -@ 4 -m 2G -o "${OUTDIR}/${PREFIX}_aligned.bam" -
+
+  samtools index "${OUTDIR}/${PREFIX}_aligned.bam"
+done
 ```
 
 #### 3.2 MarkDuplicates
@@ -321,8 +398,9 @@ done
 
 PREFIX="SIMULATED_SAMPLE_chr22"
 
-for COV in 10 20 30 50 100 200; do
-  echo "=== MarkDuplicates: ${COV}x ==="
+# === WGS ===
+for COV in 10 20 30 50; do
+  echo "=== MarkDuplicates WGS: ${COV}x ==="
   OUTDIR="results/preprocessing/${COV}x"
 
   gatk MarkDuplicates \
@@ -335,6 +413,22 @@ for COV in 10 20 30 50 100 200; do
     --CREATE_INDEX true \
     2>&1 | tee "logs/${COV}x/markduplicates.log"
 done
+
+# === WES ===
+for COV in 100 200; do
+  echo "=== MarkDuplicates WES: ${COV}x ==="
+  OUTDIR="results/preprocessing/${COV}x_wes"
+
+  gatk MarkDuplicates \
+    --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
+    -I "${OUTDIR}/${PREFIX}_aligned.bam" \
+    -O "${OUTDIR}/${PREFIX}_dedup.bam" \
+    -M "${OUTDIR}/${PREFIX}_dup_metrics.txt" \
+    --VALIDATION_STRINGENCY SILENT \
+    --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 \
+    --CREATE_INDEX true \
+    2>&1 | tee "logs/${COV}x_wes/markduplicates.log"
+done
 ```
 
 #### 3.3 Coverage statistics
@@ -344,8 +438,9 @@ done
 
 PREFIX="SIMULATED_SAMPLE_chr22"
 
-for COV in 10 20 30 50 100 200; do
-  echo "=== Stats: ${COV}x ==="
+# === WGS ===
+for COV in 10 20 30 50; do
+  echo "=== Stats WGS: ${COV}x ==="
   OUTDIR="results/preprocessing/${COV}x"
 
   samtools stats "${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/${PREFIX}_stats.txt"
@@ -356,30 +451,44 @@ for COV in 10 20 30 50 100 200; do
     "${OUTDIR}/${PREFIX}_coverage" \
     "${OUTDIR}/${PREFIX}_dedup.bam"
 
-  # Export BAM path cho downstream scripts
+  echo "FINAL_BAM=${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/bam_path.sh"
+done
+
+# === WES ===
+for COV in 100 200; do
+  echo "=== Stats WES: ${COV}x ==="
+  OUTDIR="results/preprocessing/${COV}x_wes"
+
+  samtools stats "${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/${PREFIX}_stats.txt"
+  samtools flagstat "${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/${PREFIX}_flagstat.txt"
+  samtools idxstats "${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/${PREFIX}_idxstats.txt"
+
+  mosdepth -t 4 --by 1000 \
+    "${OUTDIR}/${PREFIX}_coverage" \
+    "${OUTDIR}/${PREFIX}_dedup.bam"
+
   echo "FINAL_BAM=${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/bam_path.sh"
 done
 ```
 
 > Hoặc chạy gọn bằng script: `bash pipelines/00_preprocess.sh <coverage>`
 
-Output (per coverage level `{COV}x`):
-- `results/preprocessing/{COV}x/SIMULATED_SAMPLE_chr22_dedup.bam` — BAM đã dedup (dùng cho tất cả callers)
-- `results/preprocessing/{COV}x/bam_path.sh` — export path cho caller scripts
-- `results/preprocessing/{COV}x/*_stats.txt` — alignment statistics
-- `results/preprocessing/{COV}x/*_coverage.*` — mosdepth coverage
+Output:
+- WGS: `results/preprocessing/{COV}x/` — BAM, stats, coverage (COV = 10, 20, 30, 50)
+- WES: `results/preprocessing/{COV}x_wes/` — BAM, stats, coverage (COV = 100, 200)
 
 ### Phần IV. Gọi biến thể — Multi-coverage, WGS + WES
 
-Chạy tất cả caller cho mỗi mức coverage. WGS callers cho mọi coverage,
-WES callers cho coverage phù hợp (50x, 100x, 200x).
+Chạy tất cả caller cho mỗi mức coverage:
+- **WGS:** 10x, 20x, 30x, 50x — dùng BAM từ `results/preprocessing/{COV}x/`
+- **WES:** 100x, 200x — dùng BAM từ `results/preprocessing/{COV}x_wes/`
 
 #### 4.1 WGS Variant Calling
 
 ```bash
 # pwd: variant-benchmarking
 
-for COV in 10 20 30 50 100 200; do
+for COV in 10 20 30 50; do
   echo "=== Variant Calling: ${COV}x WGS ==="
   export PREPROC_DIR="results/preprocessing/${COV}x"
   export VARIANT_DIR="results/variants/${COV}x"
@@ -397,16 +506,16 @@ for COV in 10 20 30 50 100 200; do
 done
 ```
 
-#### 4.2 WES Variant Calling (coverage ≥ 50x)
+#### 4.2 WES Variant Calling (100x, 200x)
 
 ```bash
 # pwd: variant-benchmarking
 
-for COV in 50 100 200; do
+for COV in 100 200; do
   echo "=== Variant Calling: ${COV}x WES ==="
-  export PREPROC_DIR="results/preprocessing/${COV}x"
+  export PREPROC_DIR="results/preprocessing/${COV}x_wes"
   export VARIANT_DIR="results/variants/${COV}x"
-  export LOG_DIR="logs/${COV}x"
+  export LOG_DIR="logs/${COV}x_wes"
   mkdir -p "${VARIANT_DIR}"/{gatk_wes,deepvariant_wes,strelka2_wes,freebayes_wes,dnascope_wes}
 
   source "${PREPROC_DIR}/bam_path.sh"
@@ -428,7 +537,7 @@ Output per coverage:
 - `results/variants/{COV}x/*_wes/` — WES mode scripts (same but with exome targets)
 
 > **Callers:** 5 callers × (WGS + WES) = 10 pipelines per coverage level
-> **Total VCFs:** 6 coverages × WGS (5) + 3 coverages × WES (5) = 45+ VCFs
+> **Total VCFs:** 4 coverages × WGS (5) + 2 coverages × WES (5) = 30+ VCFs
 
 ### Phần V. So sánh các công cụ gọi biến thể bằng RTG Tools VCFEval 
 
