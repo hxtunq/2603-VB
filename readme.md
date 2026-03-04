@@ -11,7 +11,10 @@ chr22.fa (hg38)
     │
     └── ART Illumina (6 mức coverage: 10x, 20x, 30x, 50x, 100x, 200x)
             │
-            └── BWA-MEM → MarkDuplicates → BQSR
+            └── BWA-MEM → MarkDuplicates → dedup BAM
+                    │
+                    ├── GATK HC: BQSR → HaplotypeCaller → CNN/Hard Filter
+                    ├── DeepVariant, Strelka2+Manta, FreeBayes, DNAscope
                     │
                     ├── WGS: 5 callers × 6 coverages
                     └── WES: 5 callers × 3 coverages (≥50x)
@@ -29,9 +32,8 @@ variant-calling-benchmark/
 │   └── config.sh                    # Cấu hình chung (resources, paths, params)
 │
 ├── pipelines/                       # Scripts gọi biến thể
-│   ├── 01_bwa_mem.sh                # BWA-MEM alignment
-│   ├── 02_dedup.sh                  # MarkDuplicates
-│   ├── 03_call_hc.sh                # GATK HaplotypeCaller (CNN 1D/2D + Hard Filter)
+│   ├── 00_preprocess.sh             # BWA-MEM → sort → MarkDuplicates → stats
+│   ├── 03_call_hc.sh                # GATK HC (BQSR + CNN 1D/2D + Hard Filter)
 │   ├── 03_call_hc_wes.sh            # GATK HC — WES mode (-L exome BED)
 │   ├── 04_call_dv.sh                # DeepVariant WGS
 │   ├── 04_call_dv_wes.sh            # DeepVariant WES (--model_type=WES)

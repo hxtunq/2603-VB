@@ -278,7 +278,17 @@ Output:
 
 ### Phần III. Tiền xử lý dữ liệu cho công đoạn gọi biến thể — Multi-coverage
 
-Pipeline chạy lặp cho MỖI mức coverage: FastQC → BWA-MEM → MarkDuplicates → BQSR → Filter
+Theo paper (Barbitoff et al. 2022), preprocessing chung cho **tất cả callers** chỉ gồm:
+**BWA-MEM → sort → MarkDuplicates → coverage stats**
+
+> **Lưu ý quan trọng:**  
+> **BQSR** (Base Quality Score Recalibration) chỉ áp dụng cho **GATK HaplotypeCaller** (theo GATK Best Practices).  
+> Các caller khác (DeepVariant, Strelka2, FreeBayes, DNAscope) dùng trực tiếp **dedup BAM** mà không cần BQSR.  
+> BQSR đã được tích hợp sẵn trong script `pipelines/03_call_hc.sh`.
+
+Chạy lặp cho **mỗi mức coverage**:
+
+#### 3.1 BWA-MEM alignment + sort
 
 ```bash
 # pwd: variant-benchmarking
@@ -287,73 +297,77 @@ PREFIX="SIMULATED_SAMPLE_chr22"
 REF="data/reference/chr22.fa"
 
 for COV in 10 20 30 50 100 200; do
-  echo "============================================"
-  echo "Processing ${COV}x coverage"
-  echo "============================================"
+  echo "=== BWA-MEM: ${COV}x ==="
 
   R1="data/simulated/${PREFIX}_${COV}x_R1.fastq.gz"
   R2="data/simulated/${PREFIX}_${COV}x_R2.fastq.gz"
   OUTDIR="results/preprocessing/${COV}x"
   mkdir -p "${OUTDIR}" "logs/${COV}x"
 
-  # --- 3.1 FastQC ---
-  mkdir -p "${OUTDIR}/fastqc"
-  fastqc -t 4 -o "${OUTDIR}/fastqc" "${R1}" "${R2}" 2>&1 | tee "logs/${COV}x/fastqc.log"
-
-  # --- 3.2 BWA-MEM ---
   bwa mem -t 4 -M \
-    -R "@RG\tID:${PREFIX}_${COV}x\tSM:${PREFIX}\tPL:ILLUMINA\tLB:lib1\tPU:unit1" \
+    -R "@RG\tID:${PREFIX}_${COV}x\tSM:SIMULATED_SAMPLE\tPL:ILLUMINA\tLB:lib1\tPU:unit1" \
     "${REF}" "${R1}" "${R2}" \
     2> "logs/${COV}x/bwa_mem.log" | \
     samtools sort -@ 4 -m 2G -o "${OUTDIR}/${PREFIX}_aligned.bam" -
+
   samtools index "${OUTDIR}/${PREFIX}_aligned.bam"
-
-  # --- 3.3 MarkDuplicates ---
-  gatk MarkDuplicates \
-    --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
-    -I "${OUTDIR}/${PREFIX}_aligned.bam" \
-    -O "${OUTDIR}/${PREFIX}_marked.bam" \
-    -M "${OUTDIR}/${PREFIX}_dup_metrics.txt" \
-    --VALIDATION_STRINGENCY SILENT --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 \
-    --CREATE_INDEX true 2>&1 | tee "logs/${COV}x/markduplicates.log"
-
-  # --- 3.4 BQSR ---
-  gatk BaseRecalibrator \
-    --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
-    -R "${REF}" \
-    -I "${OUTDIR}/${PREFIX}_marked.bam" \
-    --known-sites data/reference/dbsnp138.hg38.chr22.vcf.gz \
-    --known-sites data/reference/Mills_and_1000G_gold_standard.indels.hg38.chr22.vcf.gz \
-    --known-sites data/reference/1000G_phase1.snps.high_confidence.hg38.chr22.vcf.gz \
-    -O "${OUTDIR}/${PREFIX}_recal.table" 2>&1 | tee "logs/${COV}x/bqsr.log"
-
-  gatk ApplyBQSR \
-    --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
-    -R "${REF}" -I "${OUTDIR}/${PREFIX}_marked.bam" \
-    --bqsr-recal-file "${OUTDIR}/${PREFIX}_recal.table" \
-    -O "${OUTDIR}/${PREFIX}_recal.bam" 2>&1 | tee "logs/${COV}x/applybqsr.log"
-  samtools index "${OUTDIR}/${PREFIX}_recal.bam"
-
-  # --- 3.5 Filter by mapping quality ---
-  samtools view -@ 4 -b -q 20 -F 1796 "${OUTDIR}/${PREFIX}_recal.bam" | \
-    samtools sort -@ 4 -o "${OUTDIR}/${PREFIX}_final.bam" -
-  samtools index "${OUTDIR}/${PREFIX}_final.bam"
-
-  # --- 3.6 Coverage stats ---
-  samtools stats "${OUTDIR}/${PREFIX}_final.bam" > "${OUTDIR}/${PREFIX}_stats.txt"
-  samtools flagstat "${OUTDIR}/${PREFIX}_final.bam" > "${OUTDIR}/${PREFIX}_flagstat.txt"
-  mosdepth -t 4 --by 1000 "${OUTDIR}/${PREFIX}_coverage" "${OUTDIR}/${PREFIX}_final.bam"
-
-  # --- 3.7 Export BAM path ---
-  echo "FINAL_BAM=${OUTDIR}/${PREFIX}_final.bam" > "${OUTDIR}/bam_path.sh"
-
-  echo "Done: ${OUTDIR}/${PREFIX}_final.bam"
 done
 ```
 
+#### 3.2 MarkDuplicates
+
+```bash
+# pwd: variant-benchmarking
+
+PREFIX="SIMULATED_SAMPLE_chr22"
+
+for COV in 10 20 30 50 100 200; do
+  echo "=== MarkDuplicates: ${COV}x ==="
+  OUTDIR="results/preprocessing/${COV}x"
+
+  gatk MarkDuplicates \
+    --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
+    -I "${OUTDIR}/${PREFIX}_aligned.bam" \
+    -O "${OUTDIR}/${PREFIX}_dedup.bam" \
+    -M "${OUTDIR}/${PREFIX}_dup_metrics.txt" \
+    --VALIDATION_STRINGENCY SILENT \
+    --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 \
+    --CREATE_INDEX true \
+    2>&1 | tee "logs/${COV}x/markduplicates.log"
+done
+```
+
+#### 3.3 Coverage statistics
+
+```bash
+# pwd: variant-benchmarking
+
+PREFIX="SIMULATED_SAMPLE_chr22"
+
+for COV in 10 20 30 50 100 200; do
+  echo "=== Stats: ${COV}x ==="
+  OUTDIR="results/preprocessing/${COV}x"
+
+  samtools stats "${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/${PREFIX}_stats.txt"
+  samtools flagstat "${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/${PREFIX}_flagstat.txt"
+  samtools idxstats "${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/${PREFIX}_idxstats.txt"
+
+  mosdepth -t 4 --by 1000 \
+    "${OUTDIR}/${PREFIX}_coverage" \
+    "${OUTDIR}/${PREFIX}_dedup.bam"
+
+  # Export BAM path cho downstream scripts
+  echo "FINAL_BAM=${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/bam_path.sh"
+done
+```
+
+> Hoặc chạy gọn bằng script: `bash pipelines/00_preprocess.sh <coverage>`
+
 Output (per coverage level `{COV}x`):
-- `results/preprocessing/{COV}x/SIMULATED_SAMPLE_chr22_final.bam` — BAM cuối cùng
-- `results/preprocessing/{COV}x/bam_path.sh` — export path cho downstream scripts
+- `results/preprocessing/{COV}x/SIMULATED_SAMPLE_chr22_dedup.bam` — BAM đã dedup (dùng cho tất cả callers)
+- `results/preprocessing/{COV}x/bam_path.sh` — export path cho caller scripts
+- `results/preprocessing/{COV}x/*_stats.txt` — alignment statistics
+- `results/preprocessing/{COV}x/*_coverage.*` — mosdepth coverage
 
 ### Phần IV. Gọi biến thể — Multi-coverage, WGS + WES
 
