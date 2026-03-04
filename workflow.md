@@ -13,11 +13,9 @@ cd variant-benchmarking/
 mkdir -p data/reference
 mkdir -p data/simulated
 mkdir -p results/preprocessing
-mkdir -p results/variants/{gatk,deepvariant,strelka2,freebayes,dnascope}
-mkdir -p results/variants/{gatk_wes,deepvariant_wes,strelka2_wes,freebayes_wes,dnascope_wes}
-mkdir -p results/eval
+mkdir -p results/variants
 mkdir -p results/plots
-mkdir -p logs/time
+mkdir -p logs
 ```
 
 ### Phần II. Download và chuẩn bị dữ liệu
@@ -81,27 +79,15 @@ tabix -p vcf 1000G_phase1.snps.high_confidence.hg38.chr22.vcf.gz
 
 # xoá file không sử dụng đến
 rm -f Homo_sapiens_assembly38.dbsnp138.vcf Homo_sapiens_assembly38.dbsnp138.vcf.idx
+rm -f dbsnp138.hg38.vcf.gz dbsnp138.hg38.vcf.gz.tbi
 rm -f Mills_and_1000G_gold_standard.indels.hg38.vcf.gz Mills_and_1000G_gold_standard.indels.hg38.vcf.gz.tbi
 rm -f 1000G_phase1.snps.high_confidence.hg38.vcf.gz 1000G_phase1.snps.high_confidence.hg38.vcf.gz.tbi
 ```
 
-**Một số lưu ý:**
-
 ```bash
 # pwd: variant-benchmarking/data/reference
 
-# reference genome từ UCSC sử dụng format "chr22"
-# tất cả VCF files phải có tên chromosome khớp với tên ở file reference
-
-# lệnh kiểm tra tên chromosome trong các file VCF
-bcftools view -h file.vcf.gz | grep "^##contig"
-tabix -l gile.vcf.gz # ở đồ án và repository này lấy tên là "chr22" làm chuẩn
-
-# nếu gặp lỗi "chromosome not found", kiểm tra và đổi lại tên chromosome
-# cách đổi tên "22" thành "chr22" nếu cần
-bcftools annotate --rename-chrs chr_map.txt input.vcf.gz -Oz -o output.vcf.gz
-
-# tạo file BED chứa vùng non-N của chromosome
+# tạo file BED chứa vùng non-N của chromosome (dùng cho VCFeval --bed-regions)
 python3 << 'EOF'
 from Bio import SeqIO
 import re
@@ -133,9 +119,6 @@ Output:
 
 Thông số được chỉnh theo dữ liệu thực tế (chr22 ~50 Mb, ~20K variants cho GIAB samples).
 
-> **Lưu ý:** KHÔNG dùng `-titv_ratio` để tránh bias benchmark. Để simuG tự random
-> generate SNPs với tỉ lệ transition/transversion tự nhiên.
-
 ```bash
 # pwd: variant-benchmarking/data
 
@@ -146,9 +129,8 @@ git clone https://github.com/yjx1217/simuG.git
 perl simuG/simuG.pl \
   -refseq reference/chr22.fa \
   -snp_count 18000 \
+  -titv_ratio 2.0 \
   -indel_count 2500 \
-  -indel_min_len 1 \
-  -indel_max_len 30 \
   -prefix simulated/SIMULATED_SAMPLE_chr22
 ```
 
@@ -490,19 +472,12 @@ Chạy tất cả caller cho mỗi mức coverage:
 
 for COV in 10 20 30 50; do
   echo "=== Variant Calling: ${COV}x WGS ==="
-  export PREPROC_DIR="results/preprocessing/${COV}x"
-  export VARIANT_DIR="results/variants/${COV}x"
-  export LOG_DIR="logs/${COV}x"
-  mkdir -p "${VARIANT_DIR}"/{gatk,deepvariant,strelka2,freebayes,dnascope}
-  mkdir -p "${LOG_DIR}/time"
 
-  source "${PREPROC_DIR}/bam_path.sh"
-
-  bash pipelines/03_call_hc.sh                   # GATK HC (3 filters)
-  bash pipelines/04_call_dv.sh                    # DeepVariant
-  bash pipelines/05_call_strelka.sh               # Strelka2 (with Manta)
-  bash pipelines/06_call_freebayes.sh             # FreeBayes
-  bash pipelines/07_call_dnascope.sh              # DNAscope (optional)
+  bash pipelines/03_call_hc.sh ${COV}              # GATK HC (3 filters)
+  bash pipelines/04_call_dv.sh ${COV}               # DeepVariant
+  bash pipelines/05_call_strelka.sh ${COV}           # Strelka2 (with Manta)
+  bash pipelines/06_call_freebayes.sh ${COV}         # FreeBayes
+  bash pipelines/07_call_dnascope.sh ${COV}          # DNAscope (optional)
 done
 ```
 
@@ -513,18 +488,12 @@ done
 
 for COV in 100 200; do
   echo "=== Variant Calling: ${COV}x WES ==="
-  export PREPROC_DIR="results/preprocessing/${COV}x_wes"
-  export VARIANT_DIR="results/variants/${COV}x"
-  export LOG_DIR="logs/${COV}x_wes"
-  mkdir -p "${VARIANT_DIR}"/{gatk_wes,deepvariant_wes,strelka2_wes,freebayes_wes,dnascope_wes}
 
-  source "${PREPROC_DIR}/bam_path.sh"
-
-  bash pipelines/03_call_hc_wes.sh               # GATK HC WES
-  bash pipelines/04_call_dv_wes.sh                # DeepVariant WES
-  bash pipelines/05_call_strelka_wes.sh           # Strelka2 WES (with Manta --exome)
-  bash pipelines/06_call_freebayes_wes.sh         # FreeBayes WES
-  bash pipelines/07_call_dnascope_wes.sh          # DNAscope WES (optional)
+  bash pipelines/03_call_hc_wes.sh ${COV}          # GATK HC WES
+  bash pipelines/04_call_dv_wes.sh ${COV}           # DeepVariant WES
+  bash pipelines/05_call_strelka_wes.sh ${COV}      # Strelka2 WES (with Manta --exome)
+  bash pipelines/06_call_freebayes_wes.sh ${COV}    # FreeBayes WES
+  bash pipelines/07_call_dnascope_wes.sh ${COV}     # DNAscope WES (optional)
 done
 ```
 
