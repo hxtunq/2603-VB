@@ -118,6 +118,14 @@ Rscript visualization/benchmark_plots.R
 
 ## Tham khảo
 
-- Barbitoff et al. (2022). *Systematic benchmark of state-of-the-art variant calling pipelines.* BMC Genomics. [DOI](https://doi.org/10.1186/s12864-022-08365-3)
-- [AstraZeneca-NGS reference_data](https://github.com/AstraZeneca-NGS/reference_data) — BED files
-- [GIAB](https://www.nist.gov/programs-projects/genome-bottle) — Gold standard methodology
+```bash
+# WGS coverages
+for cov in 10 20 30 50; do
+    bash pipelines/03_call_hc.sh $cov
+done
+
+# WES coverages
+for cov in 100 200; do
+    bash pipelines/03_call_hc_wes.sh $cov
+done
+```
