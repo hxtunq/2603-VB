@@ -1,7 +1,7 @@
 #!/bin/bash
-# GATK HaplotypeCaller + CNN Scoring + Hard Filtering
+# GATK HaplotypeCaller + Hard Filtering
 # Based on: caller_benchmark-main/pipelines/call_hc.sh
-# Metrics: HC measured separately, each filtering measured separately
+# CNN/NVScore removed — GATK 4.6 scorevariants package unavailable
 
 set -e
 
@@ -48,14 +48,13 @@ gatk --java-options "${JAVA_OPTS}" ApplyBQSR \
     -O "${OUT_DIR}/${PREFIX}.recal.bam"
 
 # ==========================================================================
-# HaplotypeCaller (measured separately — shared by all 3 pipelines)
+# HaplotypeCaller
 # ==========================================================================
 echo "=== HaplotypeCaller ==="
 /usr/bin/time -v -o "${TIMEDIR}/hc_calling.time" \
     gatk --java-options "${JAVA_OPTS}" HaplotypeCaller \
     -R "${REF_FASTA}" \
     -I "${OUT_DIR}/${PREFIX}.recal.bam" \
-    -bamout "${OUT_DIR}/${PREFIX}.HC.bam" \
     -O "${OUT_DIR}/${PREFIX}_HC.RAW.vcf" \
     --standard-min-confidence-threshold-for-calling "${GATK_STAND_CALL_CONF}" \
     --native-pair-hmm-threads "${THREADS}"
@@ -63,54 +62,7 @@ echo "=== HaplotypeCaller ==="
 log_metrics "gatk" "HaplotypeCaller" "${TIMEDIR}/hc_calling.time"
 
 # ==========================================================================
-# Filtering 1: CNN 1D
-# ==========================================================================
-echo "=== Filter: CNN 1D ==="
-/usr/bin/time -v -o "${TIMEDIR}/hc_filter_cnn1d.time" bash -c "
-    set -e
-    gatk --java-options '${JAVA_OPTS}' CNNScoreVariants \
-        -R '${REF_FASTA}' \
-        -V '${OUT_DIR}/${PREFIX}_HC.RAW.vcf' \
-        -O '${OUT_DIR}/${PREFIX}.HC.CNN1.vcf' \
-        -tensor-type reference
-
-    gatk --java-options '${JAVA_OPTS}' FilterVariantTranches \
-        -V '${OUT_DIR}/${PREFIX}.HC.CNN1.vcf' \
-        --output '${OUT_DIR}/${PREFIX}_HC_1DCNN.vcf' \
-        --info-key CNN_1D \
-        --snp-tranche ${CNN_SNP_TRANCHE} --indel-tranche ${CNN_INDEL_TRANCHE} \
-        --resource '${KNOWN_INDELS}' \
-        --resource '${KNOWN_SNPS}' \
-        --resource '${DBSNP}'
-"
-log_metrics "gatk" "Filter_CNN_1D" "${TIMEDIR}/hc_filter_cnn1d.time"
-
-# ==========================================================================
-# Filtering 2: CNN 2D
-# ==========================================================================
-echo "=== Filter: CNN 2D ==="
-/usr/bin/time -v -o "${TIMEDIR}/hc_filter_cnn2d.time" bash -c "
-    set -e
-    gatk --java-options '${JAVA_OPTS}' CNNScoreVariants \
-        -I '${OUT_DIR}/${PREFIX}.HC.bam' \
-        -R '${REF_FASTA}' \
-        -V '${OUT_DIR}/${PREFIX}.HC.CNN1.vcf' \
-        -O '${OUT_DIR}/${PREFIX}.HC.CNN2.vcf' \
-        -tensor-type read_tensor
-
-    gatk --java-options '${JAVA_OPTS}' FilterVariantTranches \
-        -V '${OUT_DIR}/${PREFIX}.HC.CNN2.vcf' \
-        --output '${OUT_DIR}/${PREFIX}_HC_2DCNN.vcf' \
-        --info-key CNN_2D \
-        --snp-tranche ${CNN_SNP_TRANCHE} --indel-tranche ${CNN_INDEL_TRANCHE} \
-        --resource '${KNOWN_INDELS}' \
-        --resource '${KNOWN_SNPS}' \
-        --resource '${DBSNP}'
-"
-log_metrics "gatk" "Filter_CNN_2D" "${TIMEDIR}/hc_filter_cnn2d.time"
-
-# ==========================================================================
-# Filtering 3: Hard Filter
+# Hard Filter (GATK Best Practices)
 # ==========================================================================
 echo "=== Filter: Hard Filter ==="
 /usr/bin/time -v -o "${TIMEDIR}/hc_filter_hard.time" bash -c "
@@ -149,9 +101,5 @@ log_metrics "gatk" "Filter_HardFilter" "${TIMEDIR}/hc_filter_hard.time"
 
 echo ""
 echo "HC done. Metrics in ${METRICS}:"
-echo "  HaplotypeCaller  = shared calling step"
-echo "  Filter_CNN_1D    → ${PREFIX}_HC_1DCNN.vcf"
-echo "  Filter_CNN_2D    → ${PREFIX}_HC_2DCNN.vcf"
-echo "  Filter_HardFilter → ${PREFIX}_HC_HARDFILTER.vcf"
-echo ""
-echo "Total time per pipeline = HaplotypeCaller + Filter_*"
+echo "  HaplotypeCaller    = calling step"
+echo "  Filter_HardFilter  → ${PREFIX}_HC_HARDFILTER.vcf"

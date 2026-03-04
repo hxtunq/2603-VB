@@ -1,7 +1,7 @@
 #!/bin/bash
-# GATK HaplotypeCaller + CNN Scoring + Hard Filtering — WES Mode
+# GATK HaplotypeCaller + Hard Filtering — WES Mode
 # Same as 03_call_hc.sh but with --intervals for exome targets
-# Uses EXOME_BED to restrict calling to exome regions
+# CNN/NVScore removed — GATK 4.6 scorevariants package unavailable
 
 set -e
 
@@ -55,14 +55,13 @@ gatk --java-options "${JAVA_OPTS}" ApplyBQSR \
     -O "${OUT_DIR}/${PREFIX}.recal.bam"
 
 # ==========================================================================
-# HaplotypeCaller (measured separately — WES mode with intervals)
+# HaplotypeCaller (WES mode with intervals)
 # ==========================================================================
 echo "=== HaplotypeCaller (WES) ==="
 /usr/bin/time -v -o "${TIMEDIR}/hc_wes_calling.time" \
     gatk --java-options "${JAVA_OPTS}" HaplotypeCaller \
     -R "${REF_FASTA}" \
     -I "${OUT_DIR}/${PREFIX}.recal.bam" \
-    -bamout "${OUT_DIR}/${PREFIX}.HC.bam" \
     -O "${OUT_DIR}/${PREFIX}_HC.RAW.vcf" \
     -L "${EXOME_BED}" \
     --standard-min-confidence-threshold-for-calling "${GATK_STAND_CALL_CONF}" \
@@ -71,54 +70,7 @@ echo "=== HaplotypeCaller (WES) ==="
 log_metrics "gatk_wes" "HaplotypeCaller_WES" "${TIMEDIR}/hc_wes_calling.time"
 
 # ==========================================================================
-# Filtering 1: CNN 1D
-# ==========================================================================
-echo "=== Filter: CNN 1D (WES) ==="
-/usr/bin/time -v -o "${TIMEDIR}/hc_wes_filter_cnn1d.time" bash -c "
-    set -e
-    gatk --java-options '${JAVA_OPTS}' CNNScoreVariants \
-        -R '${REF_FASTA}' \
-        -V '${OUT_DIR}/${PREFIX}_HC.RAW.vcf' \
-        -O '${OUT_DIR}/${PREFIX}.HC.CNN1.vcf' \
-        -tensor-type reference
-
-    gatk --java-options '${JAVA_OPTS}' FilterVariantTranches \
-        -V '${OUT_DIR}/${PREFIX}.HC.CNN1.vcf' \
-        --output '${OUT_DIR}/${PREFIX}_HC_1DCNN.vcf' \
-        --info-key CNN_1D \
-        --snp-tranche ${CNN_SNP_TRANCHE} --indel-tranche ${CNN_INDEL_TRANCHE} \
-        --resource '${KNOWN_INDELS}' \
-        --resource '${KNOWN_SNPS}' \
-        --resource '${DBSNP}'
-"
-log_metrics "gatk_wes" "Filter_CNN_1D_WES" "${TIMEDIR}/hc_wes_filter_cnn1d.time"
-
-# ==========================================================================
-# Filtering 2: CNN 2D
-# ==========================================================================
-echo "=== Filter: CNN 2D (WES) ==="
-/usr/bin/time -v -o "${TIMEDIR}/hc_wes_filter_cnn2d.time" bash -c "
-    set -e
-    gatk --java-options '${JAVA_OPTS}' CNNScoreVariants \
-        -I '${OUT_DIR}/${PREFIX}.HC.bam' \
-        -R '${REF_FASTA}' \
-        -V '${OUT_DIR}/${PREFIX}.HC.CNN1.vcf' \
-        -O '${OUT_DIR}/${PREFIX}.HC.CNN2.vcf' \
-        -tensor-type read_tensor
-
-    gatk --java-options '${JAVA_OPTS}' FilterVariantTranches \
-        -V '${OUT_DIR}/${PREFIX}.HC.CNN2.vcf' \
-        --output '${OUT_DIR}/${PREFIX}_HC_2DCNN.vcf' \
-        --info-key CNN_2D \
-        --snp-tranche ${CNN_SNP_TRANCHE} --indel-tranche ${CNN_INDEL_TRANCHE} \
-        --resource '${KNOWN_INDELS}' \
-        --resource '${KNOWN_SNPS}' \
-        --resource '${DBSNP}'
-"
-log_metrics "gatk_wes" "Filter_CNN_2D_WES" "${TIMEDIR}/hc_wes_filter_cnn2d.time"
-
-# ==========================================================================
-# Filtering 3: Hard Filter
+# Hard Filter (GATK Best Practices)
 # ==========================================================================
 echo "=== Filter: Hard Filter (WES) ==="
 /usr/bin/time -v -o "${TIMEDIR}/hc_wes_filter_hard.time" bash -c "
@@ -157,7 +109,5 @@ log_metrics "gatk_wes" "Filter_HardFilter_WES" "${TIMEDIR}/hc_wes_filter_hard.ti
 
 echo ""
 echo "HC WES done. Metrics in ${METRICS}:"
-echo "  HaplotypeCaller_WES  = calling with -L ${EXOME_BED}"
-echo "  Filter_CNN_1D_WES    → ${PREFIX}_HC_1DCNN.vcf"
-echo "  Filter_CNN_2D_WES    → ${PREFIX}_HC_2DCNN.vcf"
+echo "  HaplotypeCaller_WES   = calling with -L ${EXOME_BED}"
 echo "  Filter_HardFilter_WES → ${PREFIX}_HC_HARDFILTER.vcf"

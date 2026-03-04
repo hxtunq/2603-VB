@@ -53,7 +53,7 @@ export REF_DICT="${REF_DIR}/${CHR_TO_USE}.dict"
 export REF_FAI="${REF_DIR}/${CHR_TO_USE}.fa.fai"
 
 # Known sites for BQSR (GATK Bundle)
-export DBSNP="${REF_DIR}/dbsnp_146.hg38.chr22.vcf.gz"
+export DBSNP="${REF_DIR}/dbsnp138.hg38.chr22.vcf.gz"
 export KNOWN_INDELS="${REF_DIR}/Mills_and_1000G_gold_standard.indels.hg38.chr22.vcf.gz"
 export KNOWN_SNPS="${REF_DIR}/1000G_phase1.snps.high_confidence.hg38.chr22.vcf.gz"
 
@@ -142,10 +142,6 @@ export RTG_SDF="${REF_DIR}/${CHR_TO_USE}.sdf"
 #-------------------------------------------------------------------------------
 # GATK HaplotypeCaller (default GATK 4.x = 10)
 export GATK_STAND_CALL_CONF=10
-
-# GATK CNN filtering tranches (matched to Barbitoff et al. 2022)
-export CNN_SNP_TRANCHE="99.9"
-export CNN_INDEL_TRANCHE="99.5"
 
 # FreeBayes
 export FB_MIN_ALT_COUNT=3
