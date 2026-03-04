@@ -1,76 +1,121 @@
 # Variant Calling Benchmark
 
-So sánh và đánh giá hiệu năng của 4 công cụ gọi biến thể — **GATK 4.6.2.0**, **DeepVariant 1.8.0**, **Strelka2 2.9.10**, **FreeBayes 1.3.10** — trên dữ liệu WGS giả lập (chr22, hg38, 60x).
+Hệ thống benchmark so sánh hiệu suất các công cụ gọi biến thể (variant caller) trên dữ liệu giả lập từ chromosome 22 (hg38). Thiết kế theo phương pháp luận của [Barbitoff et al. 2022, BMC Genomics](https://doi.org/10.1186/s12864-022-08365-3).
+
+## Tổng quan
+
+```
+chr22.fa (hg38)
+    │
+    ├── simuG → 18K SNPs + 2.5K INDELs (truth VCF)
+    │
+    └── ART Illumina (6 mức coverage: 10x, 20x, 30x, 50x, 100x, 200x)
+            │
+            └── BWA-MEM → MarkDuplicates → BQSR
+                    │
+                    ├── WGS: 5 callers × 6 coverages
+                    └── WES: 5 callers × 3 coverages (≥50x)
+                            │
+                            └── hap.py + vcfeval → F1, Precision, Recall
+```
+
+**Tổng cộng:** ~45 VCFs → đánh giá cả WGS lẫn WES với stratification regions.
 
 ## Cấu trúc thư mục
 
-```text
+```
 variant-calling-benchmark/
-│
-├── readme.md                          # Tổng quan project
-├── workflow.md                        # Quy trình thực hiện chi tiết (step-by-step)
-│
 ├── config/
-│   └── config.sh                      # Cấu hình chung: paths, versions, tham số simulation & calling
+│   └── config.sh                    # Cấu hình chung (resources, paths, params)
 │
-├── stages/                            # Các script chạy variant calling
-│   ├── 03_variant_calling_gatk.sh     # GATK HaplotypeCaller + hard filtering
-│   ├── 04_variant_calling_deepvariant.sh  # DeepVariant via Docker
-│   ├── 05_variant_calling_strelka2.sh # Strelka2 Germline via Docker
-│   ├── 06_variant_calling_freebayes.sh    # FreeBayes
-│   └── 07_snpeff_annotate.sh          # SnpEff + SnpSift annotation (FN/FP)
+├── pipelines/                       # Scripts gọi biến thể
+│   ├── 01_bwa_mem.sh                # BWA-MEM alignment
+│   ├── 02_dedup.sh                  # MarkDuplicates
+│   ├── 03_call_hc.sh                # GATK HaplotypeCaller (CNN 1D/2D + Hard Filter)
+│   ├── 03_call_hc_wes.sh            # GATK HC — WES mode (-L exome BED)
+│   ├── 04_call_dv.sh                # DeepVariant WGS
+│   ├── 04_call_dv_wes.sh            # DeepVariant WES (--model_type=WES)
+│   ├── 05_call_strelka.sh           # Manta + Strelka2 WGS
+│   ├── 05_call_strelka_wes.sh       # Manta + Strelka2 WES (--exome)
+│   ├── 06_call_freebayes.sh         # FreeBayes WGS
+│   ├── 06_call_freebayes_wes.sh     # FreeBayes WES (--targets)
+│   ├── 07_call_dnascope.sh          # Sentieon DNAscope WGS (optional)
+│   └── 07_call_dnascope_wes.sh      # Sentieon DNAscope WES (optional)
 │
-├── scripts/                           # Scripts phụ trợ
-│   ├── helper_functions.sh            # Logging, timer, resource tracking
-│   ├── normalize_vcf.sh               # Chuẩn hoá VCF cho benchmarking (bcftools norm)
-│   ├── rename_chromosomes.sh          # Đổi tên chromosome (22 → chr22) nếu cần
-│   ├── functional_risk_analysis.py    # Phân tích risk: SnpEff Impact + ACMG 5-tier
-│   └── batch_alphagenome_fn_fp.py     # Chấm điểm FN/FP bằng AlphaGenome (Deep Learning)
+├── evaluation/
+│   ├── eval_happy.sh                # hap.py evaluation (multi-coverage, WGS+WES)
+│   └── gather_stats.sh              # Thu thập kết quả vào TSV
 │
-├── data-viz/                          # Trực quan hoá dữ liệu
-│   ├── upset-plot.Rmd                 # UpSet plot (R Markdown)
-│   ├── upset_long_baseline.csv        # Dữ liệu TP-baseline cho UpSet plot
-│   └── upset_long_callset.csv         # Dữ liệu TP-callset cho UpSet plot
+├── visualization/
+│   ├── benchmark_plots.R            # R script vẽ biểu đồ benchmark
+│   └── plot_summary.py              # Python summary plots
 │
-├── logs/                              # Log từ các bước chạy
-│   └── runtime.csv                    # Thời gian chạy của mỗi caller (giây)
-│
-├── data/                              # ⬇️ Sinh ra khi chạy workflow
-│   ├── reference/                     # Reference genome (chr22.fa), index, known-sites (dbSNP, Mills, 1000G)
-│   └── simulated/                     # Truth VCF + FASTQ giả lập từ simuG & ART
-│
-└── results/                           # ⬇️ Kết quả sau khi chạy pipeline
-    ├── preprocessing/                 # BAM sau alignment + BQSR, QC metrics
-    │   ├── fastqc_raw/                # FastQC report cho raw reads
-    │   ├── *_dup_metrics.txt          # Thống kê duplicate reads
-    │   ├── *_recal.table              # Bảng BQSR recalibration
-    │   ├── *_stats.txt                # samtools stats
-    │   ├── *_flagstat.txt             # samtools flagstat
-    │   ├── *_coverage.*               # Coverage analysis (mosdepth)
-    │   └── bam_path.sh                # Export đường dẫn BAM cuối cho các caller
-    │
-    ├── variants/                      # VCF output của từng caller
-    │   ├── gatk/                      # *_gatk_pass.norm.vcf.gz
-    │   ├── deepvariant/               # *_deepvariant_pass.norm.vcf.gz
-    │   ├── strelka2/                  # *_strelka2_pass.norm.vcf.gz
-    │   └── freebayes/                 # *_freebayes_pass.norm.vcf.gz
-    │
-    └── benchmarks/
-        └── rtg_vcfeval/               # So sánh từng caller vs truth (RTG VCFeval)
-            ├── gatk/                  # TP/FP/FN + summary.txt
-            ├── deepvariant/           # TP/FP/FN + summary.txt
-            ├── strelka2/              # TP/FP/FN + summary.txt
-            ├── freebayes/             # TP/FP/FN + summary.txt
-            └── merged/                # FN/FP/TP hợp nhất 4 caller (VCF + CSV)
+├── workflow.md                      # Quy trình chi tiết từng bước (copy-paste ready)
+└── caller_benchmark-main/           # Reference code từ Barbitoff et al. 2022
 ```
 
-## Quy trình
+## Variant Callers
 
-Toàn bộ quy trình được mô tả chi tiết trong [`workflow.md`](workflow.md), gồm 6 phần:
+| # | Caller | WGS | WES | Filter strategy |
+|---|--------|-----|-----|-----------------|
+| 1 | **GATK HaplotypeCaller** | ✅ | ✅ | CNN 1D, CNN 2D, Hard Filter |
+| 2 | **DeepVariant** v1.9.0 | ✅ | ✅ | Default (model-based) |
+| 3 | **Strelka2** v2.9.10 | ✅ | ✅ | Default (with Manta indel candidates) |
+| 4 | **FreeBayes** v1.3.10 | ✅ | ✅ | QUAL + strand bias filters |
+| 5 | **DNAscope** (Sentieon) | ✅ | ✅ | ML model (optional, cần license) |
 
-1. **Tạo cấu trúc folder**
-2. **Download & chuẩn bị dữ liệu** — reference genome, known sites, simuG, ART
-3. **Tiền xử lý** — FastQC → BWA-MEM → MarkDuplicates → BQSR → Filter MQ≥20
-4. **Gọi biến thể** — GATK, DeepVariant, Strelka2, FreeBayes
-5. **Benchmarking** — RTG VCFeval (TP/FP/FN, Precision/Recall/F1)
-6. **Đánh giá Functional Risk** — SnpEff + ACMG + AlphaGenome
+## Coverage Design
+
+| Coverage | WGS eval | WES eval | Mục đích |
+|----------|----------|----------|----------|
+| 10x | ✅ | — | Low coverage stress test |
+| 20x | ✅ | — | Gần GIAB WGS (~22x) |
+| 30x | ✅ | — | Standard clinical WGS |
+| 50x | ✅ | ✅ | High WGS / Low WES |
+| 100x | ✅ | ✅ | Medium WES |
+| 200x | ✅ | ✅ | Gần GIAB WES (~200x) |
+
+## Cách chạy
+
+Xem chi tiết trong [workflow.md](workflow.md). Tóm tắt:
+
+```bash
+# 1. Setup
+source config/config.sh
+
+# 2. Simulate (simuG → ART multi-coverage)
+# Xem workflow.md §2.3–2.5
+
+# 3. Preprocessing (per coverage)
+# Xem workflow.md Part III
+
+# 4. Variant calling
+for COV in 10 20 30 50 100 200; do
+  export PREPROC_DIR="results/preprocessing/${COV}x"
+  source "${PREPROC_DIR}/bam_path.sh"
+  bash pipelines/03_call_hc.sh
+  bash pipelines/04_call_dv.sh
+  bash pipelines/05_call_strelka.sh
+  bash pipelines/06_call_freebayes.sh
+  bash pipelines/07_call_dnascope.sh  # optional
+done
+
+# 5. Evaluate
+bash evaluation/eval_happy.sh
+
+# 6. Visualize
+Rscript visualization/benchmark_plots.R
+```
+
+## Đánh giá
+
+- **Tool:** hap.py + RTGtools vcfeval
+- **Metrics:** F1 Score, Precision, Recall (SNP + INDEL riêng)
+- **Stratification:** CDS regions, Exome targets, Low-mappability regions
+- **Statistical power:** Nhiều coverage levels → boxplot + so sánh xu hướng
+
+## Tham khảo
+
+- Barbitoff et al. (2022). *Systematic benchmark of state-of-the-art variant calling pipelines.* BMC Genomics. [DOI](https://doi.org/10.1186/s12864-022-08365-3)
+- [AstraZeneca-NGS reference_data](https://github.com/AstraZeneca-NGS/reference_data) — BED files
+- [GIAB](https://www.nist.gov/programs-projects/genome-bottle) — Gold standard methodology

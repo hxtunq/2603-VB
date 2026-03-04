@@ -1,0 +1,59 @@
+#!/bin/bash
+# DeepVariant via Docker
+# Based on: caller_benchmark-main/pipelines/call_dv.sh
+# Metrics: runtime + Max RSS for docker run
+
+set -e
+
+source "$(dirname "$0")/../config/config.sh"
+source "${PREPROC_DIR}/bam_path.sh"
+
+CALLER="deepvariant"
+OUT_DIR="${VARIANT_DIR}/${CALLER}"
+TIMEDIR="${LOG_DIR}/time"
+mkdir -p "${OUT_DIR}" "${TIMEDIR}"
+
+METRICS="${LOG_DIR}/benchmark_metrics.tsv"
+if [[ ! -f "${METRICS}" ]]; then
+    echo -e "Caller\tPipeline\tWallClock_sec\tCPU_percent\tMaxRSS_kB" > "${METRICS}"
+fi
+
+log_metrics() {
+    local caller="$1" pipeline="$2" timefile="$3"
+    local wall cpu rss
+    wall=$(awk -F': ' '/Elapsed \(wall clock\) time/{print $2}' "$timefile")
+    cpu=$(awk -F': ' '/Percent of CPU this job got/{print $2}' "$timefile" | tr -d '%')
+    rss=$(awk -F': ' '/Maximum resident set size \(kbytes\)/{print $2}' "$timefile")
+    local secs
+    secs=$(echo "$wall" | awk -F: '{if(NF==3) print $1*3600+$2*60+$3; else print $1*60+$2}')
+    echo -e "${caller}\t${pipeline}\t${secs}\t${cpu}\t${rss}" >> "${METRICS}"
+    echo "  [METRICS] ${pipeline}: ${wall} wall, ${cpu}% CPU, MaxRSS=${rss} kB"
+}
+
+ABS_REF_DIR=$(cd "${REF_DIR}" && pwd)
+ABS_PREPROC_DIR=$(cd "${PREPROC_DIR}" && pwd)
+ABS_OUT_DIR=$(cd "${OUT_DIR}" && pwd)
+
+BAM_BASENAME=$(basename "${FINAL_BAM}")
+REF_BASENAME=$(basename "${REF_FASTA}")
+
+echo "=== Running DeepVariant ${DEEPVARIANT_VERSION} ==="
+/usr/bin/time -v -o "${TIMEDIR}/deepvariant.time" \
+    docker run --rm \
+    -v "${ABS_REF_DIR}:/ref:ro" \
+    -v "${ABS_PREPROC_DIR}:/input:ro" \
+    -v "${ABS_OUT_DIR}:/output" \
+    ${DEEPVARIANT_IMAGE} \
+    /opt/deepvariant/bin/run_deepvariant \
+    --model_type=WGS \
+    --ref="/ref/${REF_BASENAME}" \
+    --reads="/input/${BAM_BASENAME}" \
+    --output_vcf="/output/${PREFIX}_DV_STANDART.vcf" \
+    --output_gvcf="/output/${PREFIX}_DV.g.vcf" \
+    --num_shards=${THREADS}
+
+log_metrics "deepvariant" "DeepVariant" "${TIMEDIR}/deepvariant.time"
+
+echo ""
+echo "DV done: ${OUT_DIR}/${PREFIX}_DV_STANDART.vcf"
+echo "Metrics: ${METRICS}"

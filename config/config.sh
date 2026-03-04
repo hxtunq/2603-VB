@@ -1,7 +1,7 @@
 #!/bin/bash
 #===============================================================================
 # CONFIG: Cấu hình chung cho pipeline variant calling benchmarking
-# Theo GATK Best Practices (nf-core/sarek)
+# Theo GATK Best Practices (nf-core/sarek) — Multi-coverage, WGS + WES
 #===============================================================================
 
 #-------------------------------------------------------------------------------
@@ -39,6 +39,7 @@ export LOG_DIR="${PROJECT_DIR}/logs"
 export PREPROC_DIR="${RESULTS_DIR}/preprocessing"
 export VARIANT_DIR="${RESULTS_DIR}/variants"
 export BENCH_DIR="${RESULTS_DIR}/benchmarks"
+export EVAL_DIR="${RESULTS_DIR}/eval"
 export FIGURE_DIR="${RESULTS_DIR}/plots"
 export METRICS_DIR="${RESULTS_DIR}/final_metrics"
 
@@ -59,14 +60,20 @@ export KNOWN_SNPS="${REF_DIR}/1000G_phase1.snps.high_confidence.hg38.chr22.vcf.g
 #-------------------------------------------------------------------------------
 # SIMULATION PARAMETERS (simuG + ART)
 #-------------------------------------------------------------------------------
-# simuG parameters for mutation simulation
-export SNP_COUNT=7000          # Number of SNPs to simulate
-export INDEL_COUNT=3500        # Number of indels to simulate (combined del+ins)
-export INDEL_MIN_LEN=1         # Minimum indel length
-export INDEL_MAX_LEN=5         # Maximum indel length
+# simuG — realistic for chr22 (~50 Mb, ~20K true variants)
+# NOTE: -titv_ratio removed intentionally to avoid biasing benchmark
+export SNP_COUNT=18000          # ~18K SNPs (realistic for chr22)
+export INDEL_COUNT=2500         # ~2.5K indels (SNP:INDEL ~ 7:1)
+export INDEL_MIN_LEN=1          # Minimum indel length
+export INDEL_MAX_LEN=30         # Up to 30bp to test longer indels
 
-# ART Illumina parameters
-export COVERAGE=60
+# ART Illumina — multi-coverage design
+# WGS coverages: low to medium (like GIAB WGS 22-37x)
+# Higher coverages: for WES-like evaluation (GIAB WES 183-249x)
+export COVERAGES_WGS=(10 20 30 50)
+export COVERAGES_WES=(100 200)
+export COVERAGES_ALL=(10 20 30 50 100 200)
+
 export READ_LENGTH=150
 export FRAGMENT_MEAN=350
 export FRAGMENT_SD=50
@@ -88,6 +95,24 @@ export PREFIX="${SAMPLE_NAME}_${CHR_TO_USE}"
 export READ_GROUP="@RG\\tID:${SAMPLE_NAME}\\tSM:${SAMPLE_NAME}\\tPL:ILLUMINA\\tLB:lib1\\tPU:unit1"
 
 #-------------------------------------------------------------------------------
+# BED FILES — Exome targets + stratification
+#-------------------------------------------------------------------------------
+# Exome target BED (Agilent SureSelect V6, extracted for chr22)
+export EXOME_BED="${REF_DIR}/Exome-Agilent_V6.chr22.bed"
+
+# CDS-only BED (canonical protein-coding, extracted for chr22)
+export CDS_BED="${REF_DIR}/CDS-canonical.chr22.bed"
+
+# Mappability tricky regions (low-mappability, extracted for chr22)
+export MAPPABILITY_BED="${REF_DIR}/umap_k100_mappability.chr22.bed.gz"
+
+# Full-chromosome high-confidence region (for simulated data = non-N regions)
+export TRUTH_BED="${REF_DIR}/${CHR_TO_USE}_highconf.bed"
+
+# Stratification TSV for hap.py (list of BED files)
+export STRATIFICATION_TSV="${REF_DIR}/stratification_chr22.tsv"
+
+#-------------------------------------------------------------------------------
 # TOOL VERSIONS
 #-------------------------------------------------------------------------------
 # GATK 4.6.2.0 (system-installed)
@@ -96,16 +121,31 @@ export READ_GROUP="@RG\\tID:${SAMPLE_NAME}\\tSM:${SAMPLE_NAME}\\tPL:ILLUMINA\\tL
 #-------------------------------------------------------------------------------
 # DOCKER IMAGES
 #-------------------------------------------------------------------------------
-export DEEPVARIANT_VERSION="1.8.0"
+export DEEPVARIANT_VERSION="1.9.0"
 export DEEPVARIANT_IMAGE="google/deepvariant:${DEEPVARIANT_VERSION}"
 export STRELKA2_IMAGE="quay.io/biocontainers/strelka:2.9.10--h9ee0642_1"
+export MANTA_IMAGE="quay.io/biocontainers/manta:1.6.0--h9ee0642_2"
 export RTG_IMAGE="biocontainers/rtg-tools:3.12.1--hdfd78af_0"
+export HAPPY_IMAGE="jmcdani20/hap.py:v0.3.12"
+
+# Sentieon DNAscope (optional — requires SENTIEON_LICENSE)
+export SENTIEON_VERSION="202308.03"
+export SENTIEON_IMAGE="sentieon/sentieon:${SENTIEON_VERSION}"
+
+#-------------------------------------------------------------------------------
+# BENCHMARKING
+#-------------------------------------------------------------------------------
+export RTG_SDF="${REF_DIR}/${CHR_TO_USE}.sdf"
 
 #-------------------------------------------------------------------------------
 # VARIANT CALLER PARAMETERS
 #-------------------------------------------------------------------------------
-# GATK HaplotypeCaller (mặc định GATK 4.x = 10)
+# GATK HaplotypeCaller (default GATK 4.x = 10)
 export GATK_STAND_CALL_CONF=10
+
+# GATK CNN filtering tranches (matched to Barbitoff et al. 2022)
+export CNN_SNP_TRANCHE="99.9"
+export CNN_INDEL_TRANCHE="99.5"
 
 # FreeBayes
 export FB_MIN_ALT_COUNT=3
@@ -118,4 +158,6 @@ export TRUTH_VCF="${SIM_DIR}/${PREFIX}_truth.vcf.gz"
 
 echo "[CONFIG] Loaded successfully"
 echo "[CONFIG] Project: ${PROJECT_DIR}"
-echo "[CONFIG] Chromosome: ${CHR_TO_USE}, Coverage: ${COVERAGE}x"
+echo "[CONFIG] Chromosome: ${CHR_TO_USE}"
+echo "[CONFIG] WGS coverages: ${COVERAGES_WGS[*]}"
+echo "[CONFIG] WES coverages: ${COVERAGES_WES[*]}"

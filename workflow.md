@@ -8,14 +8,16 @@ cd variant-benchmarking/
 ```
 
 ```bash
+# pwd: variant-benchmarking
+
 mkdir -p data/reference
 mkdir -p data/simulated
 mkdir -p results/preprocessing
-mkdir -p results/variants/gatk
-mkdir -p results/variants/deepvariant
-mkdir -p results/variants/strelka2
-mkdir -p results/variants/freebayes
-mkdir -p logs
+mkdir -p results/variants/{gatk,deepvariant,strelka2,freebayes,dnascope}
+mkdir -p results/variants/{gatk_wes,deepvariant_wes,strelka2_wes,freebayes_wes,dnascope_wes}
+mkdir -p results/eval
+mkdir -p results/plots
+mkdir -p logs/time
 ```
 
 ### Phần II. Download và chuẩn bị dữ liệu
@@ -86,7 +88,7 @@ rm -f 1000G_phase1.snps.high_confidence.hg38.vcf.gz 1000G_phase1.snps.high_confi
 **Một số lưu ý:**
 
 ```bash
-# pwd = variant-benchmarking/data/reference
+# pwd: variant-benchmarking/data/reference
 
 # reference genome từ UCSC sử dụng format "chr22"
 # tất cả VCF files phải có tên chromosome khớp với tên ở file reference
@@ -129,27 +131,31 @@ Output:
 
 #### 2.3. Tạo đột biến SNPs và INDELs với simuG
 
+Thông số được chỉnh theo dữ liệu thực tế (chr22 ~50 Mb, ~20K variants cho GIAB samples).
+
+> **Lưu ý:** KHÔNG dùng `-titv_ratio` để tránh bias benchmark. Để simuG tự random
+> generate SNPs với tỉ lệ transition/transversion tự nhiên.
+
 ```bash
 # pwd: variant-benchmarking/data
 
 # clone simuG về folder <data>
 git clone https://github.com/yjx1217/simuG.git
 
-# dùng simuG tạo đột biến
+# dùng simuG tạo đột biến — thông số realistic
 perl simuG/simuG.pl \
   -refseq reference/chr22.fa \
-  -snp_count 60000 \
-  -indel_count 30000 \
+  -snp_count 18000 \
+  -indel_count 2500 \
   -indel_min_len 1 \
-  -indel_max_len 5 \
-  -titv_ratio 2.0 \
+  -indel_max_len 30 \
   -prefix simulated/SIMULATED_SAMPLE_chr22
 ```
 
 Output:
 - `data/simulated/SIMULATED_SAMPLE_chr22.simseq.genome.fa` — genome đã chứa đột biến
-- `data/simulated/SIMULATED_SAMPLE_chr22.refseq2simseq.SNP.vcf` — danh sách SNP đã tạo
-- `data/simulated/SIMULATED_SAMPLE_chr22.refseq2simseq.INDEL.vcf` — danh sách INDEL đã tạo
+- `data/simulated/SIMULATED_SAMPLE_chr22.refseq2simseq.SNP.vcf` — danh sách SNP đã tạo (~18K)
+- `data/simulated/SIMULATED_SAMPLE_chr22.refseq2simseq.INDEL.vcf` — danh sách INDEL đã tạo (~2.5K)
 
 #### 2.4. Merge các file VCF output của simuG tạo truth VCF
 
@@ -179,183 +185,236 @@ tabix -p vcf simulated/SIMULATED_SAMPLE_chr22_truth.vcf.gz
 
 Output: `data/simulated/SIMULATED_SAMPLE_chr22_truth.vcf.gz` (+`.tbi`) — truth VCF chứa toàn bộ SNP + INDEL
 
-#### 2.5. Tạo file fastq giả lập bằng ART Illumina
+#### 2.5. Tạo file fastq giả lập bằng ART Illumina — Multi-coverage
+
+Tạo nhiều mức coverage khác nhau từ CÙNG MỘT mutated genome:
+- **WGS coverage:** 10x, 20x, 30x, 50x (tương tự GIAB WGS 22–37x)
+- **WES coverage:** 100x, 200x (tương tự GIAB WES 183–249x, đánh giá trên exome BED)
 
 ```bash
-#pwd: variant-benchmarking/data
+# pwd: variant-benchmarking/data
 
 SIM_DIR="simulated"
 PREFIX="SIMULATED_SAMPLE_chr22"
 MUTATED_FASTA="${SIM_DIR}/${PREFIX}.simseq.genome.fa"
 
-art_illumina \
-    -ss HS25 \
-    -i "${MUTATED_FASTA}" \
-    -p \
-    -l 150 \
-    -f 60 \
-    -m 350 \
-    -s 50 \
-    -rs 42 \
-    -o "${SIM_DIR}/${PREFIX}_" \
-    -na
+# Multi-coverage loop
+for COV in 10 20 30 50 100 200; do
+  echo "=== Generating ${COV}x coverage ==="
 
-# đổi tên và nén
-mv "${SIM_DIR}/${PREFIX}_1.fq" "${SIM_DIR}/${PREFIX}_R1.fastq"
-mv "${SIM_DIR}/${PREFIX}_2.fq" "${SIM_DIR}/${PREFIX}_R2.fastq"
-gzip "${SIM_DIR}/${PREFIX}_R1.fastq"
-gzip "${SIM_DIR}/${PREFIX}_R2.fastq"
+  art_illumina \
+      -ss HS25 \
+      -i "${MUTATED_FASTA}" \
+      -p \
+      -l 150 \
+      -f ${COV} \
+      -m 350 \
+      -s 50 \
+      -rs 42 \
+      -o "${SIM_DIR}/${PREFIX}_${COV}x_" \
+      -na
+
+  # đổi tên và nén
+  mv "${SIM_DIR}/${PREFIX}_${COV}x_1.fq" "${SIM_DIR}/${PREFIX}_${COV}x_R1.fastq"
+  mv "${SIM_DIR}/${PREFIX}_${COV}x_2.fq" "${SIM_DIR}/${PREFIX}_${COV}x_R2.fastq"
+  gzip "${SIM_DIR}/${PREFIX}_${COV}x_R1.fastq"
+  gzip "${SIM_DIR}/${PREFIX}_${COV}x_R2.fastq"
+
+  echo "Done: ${SIM_DIR}/${PREFIX}_${COV}x_R{1,2}.fastq.gz"
+done
+```
+
+Output (per coverage level):
+- `data/simulated/SIMULATED_SAMPLE_chr22_{COV}x_R1.fastq.gz` — paired-end read 1
+- `data/simulated/SIMULATED_SAMPLE_chr22_{COV}x_R2.fastq.gz` — paired-end read 2
+
+#### 2.6. Download BED files cho exome targets và stratification
+
+Lấy từ AstraZeneca-NGS reference_data (hg38), extract chr22.
+
+```bash
+# pwd: variant-benchmarking/data/reference
+
+# === CDS regions (canonical protein-coding) ===
+wget -O CDS-canonical.bed \
+  https://raw.githubusercontent.com/AstraZeneca-NGS/reference_data/master/hg38/bed/CDS-canonical.bed
+
+# Extract chr22 only
+grep -w "chr22" CDS-canonical.bed > CDS-canonical.chr22.bed
+rm CDS-canonical.bed
+
+# === Exome target BED (Agilent SureSelect V6) ===
+wget -O Exome-Agilent_V6.bed \
+  https://raw.githubusercontent.com/AstraZeneca-NGS/reference_data/master/hg38/bed/Exome-Agilent_V6.bed
+
+# Extract chr22 only
+grep -w "chr22" Exome-Agilent_V6.bed > Exome-Agilent_V6.chr22.bed
+rm Exome-Agilent_V6.bed
+
+# === Mappability tricky regions ===
+wget -O umap_k100_mappability.bed.gz \
+  https://github.com/AstraZeneca-NGS/reference_data/raw/master/hg38/tricky_regions/umap_k100_mappability.bed.gz
+wget -O umap_k100_mappability.bed.gz.tbi \
+  https://github.com/AstraZeneca-NGS/reference_data/raw/master/hg38/tricky_regions/umap_k100_mappability.bed.gz.tbi
+
+# Extract chr22 from mappability
+tabix umap_k100_mappability.bed.gz chr22 | bgzip > umap_k100_mappability.chr22.bed.gz
+tabix -p bed umap_k100_mappability.chr22.bed.gz
+rm umap_k100_mappability.bed.gz umap_k100_mappability.bed.gz.tbi
+
+# === Tạo stratification TSV cho hap.py ===
+cat > stratification_chr22.tsv <<'EOF'
+CDS	CDS-canonical.chr22.bed
+Exome_Targets	Exome-Agilent_V6.chr22.bed
+Low_Mappability	umap_k100_mappability.chr22.bed.gz
+EOF
 ```
 
 Output:
-- `data/simulated/SIMULATED_SAMPLE_chr22_R1.fastq.gz` — paired-end read 1
-- `data/simulated/SIMULATED_SAMPLE_chr22_R2.fastq.gz` — paired-end read 2
+- `data/reference/CDS-canonical.chr22.bed` — CDS regions chr22
+- `data/reference/Exome-Agilent_V6.chr22.bed` — exome targets chr22
+- `data/reference/umap_k100_mappability.chr22.bed.gz` — low-mappability regions chr22
+- `data/reference/stratification_chr22.tsv` — stratification file cho hap.py
 
-### Phần III. Tiền xử lý dữ liệu cho công đoạn gọi biến thể
+### Phần III. Tiền xử lý dữ liệu cho công đoạn gọi biến thể — Multi-coverage
 
-Pipeline: FastQC → BWA-MEM → MarkDuplicates → BQSR
-
-#### 3.1. FastQC - Raw reads quality control
-
-```bash
-mkdir -p results/preprocessing/fastqc_raw
-fastqc -t 4 \
-  -o results/preprocessing/fastqc_raw \
-  data/simulated/SIMULATED_SAMPLE_chr22_R1.fastq.gz \
-  data/simulated/SIMULATED_SAMPLE_chr22_R2.fastq.gz \
-  2>&1 | tee logs/fastqc_raw.log
-```
-
-Output: `results/preprocessing/fastqc_raw/` — báo cáo HTML chất lượng reads
-
-#### 3.2. BWA-MEM - Alignment (directly from raw FASTQ after FastQC)
+Pipeline chạy lặp cho MỖI mức coverage: FastQC → BWA-MEM → MarkDuplicates → BQSR → Filter
 
 ```bash
-bwa mem \
-  -t 4 \
-  -R "@RG\tID:SIMULATED_SAMPLE\tSM:SIMULATED_SAMPLE\tPL:ILLUMINA\tLB:lib1\tPU:unit1" \
-  -M \
-  data/reference/chr22.fa \
-  data/simulated/SIMULATED_SAMPLE_chr22_R1.fastq.gz \
-  data/simulated/SIMULATED_SAMPLE_chr22_R2.fastq.gz \
-  2> logs/bwa_mem.log | \
-  samtools sort -@ 4 -m 2G -o results/preprocessing/SIMULATED_SAMPLE_chr22_aligned.bam -
+# pwd: variant-benchmarking
 
-samtools index results/preprocessing/SIMULATED_SAMPLE_chr22_aligned.bam
+PREFIX="SIMULATED_SAMPLE_chr22"
+REF="data/reference/chr22.fa"
+
+for COV in 10 20 30 50 100 200; do
+  echo "============================================"
+  echo "Processing ${COV}x coverage"
+  echo "============================================"
+
+  R1="data/simulated/${PREFIX}_${COV}x_R1.fastq.gz"
+  R2="data/simulated/${PREFIX}_${COV}x_R2.fastq.gz"
+  OUTDIR="results/preprocessing/${COV}x"
+  mkdir -p "${OUTDIR}" "logs/${COV}x"
+
+  # --- 3.1 FastQC ---
+  mkdir -p "${OUTDIR}/fastqc"
+  fastqc -t 4 -o "${OUTDIR}/fastqc" "${R1}" "${R2}" 2>&1 | tee "logs/${COV}x/fastqc.log"
+
+  # --- 3.2 BWA-MEM ---
+  bwa mem -t 4 -M \
+    -R "@RG\tID:${PREFIX}_${COV}x\tSM:${PREFIX}\tPL:ILLUMINA\tLB:lib1\tPU:unit1" \
+    "${REF}" "${R1}" "${R2}" \
+    2> "logs/${COV}x/bwa_mem.log" | \
+    samtools sort -@ 4 -m 2G -o "${OUTDIR}/${PREFIX}_aligned.bam" -
+  samtools index "${OUTDIR}/${PREFIX}_aligned.bam"
+
+  # --- 3.3 MarkDuplicates ---
+  gatk MarkDuplicates \
+    --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
+    -I "${OUTDIR}/${PREFIX}_aligned.bam" \
+    -O "${OUTDIR}/${PREFIX}_marked.bam" \
+    -M "${OUTDIR}/${PREFIX}_dup_metrics.txt" \
+    --VALIDATION_STRINGENCY SILENT --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 \
+    --CREATE_INDEX true 2>&1 | tee "logs/${COV}x/markduplicates.log"
+
+  # --- 3.4 BQSR ---
+  gatk BaseRecalibrator \
+    --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
+    -R "${REF}" \
+    -I "${OUTDIR}/${PREFIX}_marked.bam" \
+    --known-sites data/reference/dbsnp138.hg38.chr22.vcf.gz \
+    --known-sites data/reference/Mills_and_1000G_gold_standard.indels.hg38.chr22.vcf.gz \
+    --known-sites data/reference/1000G_phase1.snps.high_confidence.hg38.chr22.vcf.gz \
+    -O "${OUTDIR}/${PREFIX}_recal.table" 2>&1 | tee "logs/${COV}x/bqsr.log"
+
+  gatk ApplyBQSR \
+    --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
+    -R "${REF}" -I "${OUTDIR}/${PREFIX}_marked.bam" \
+    --bqsr-recal-file "${OUTDIR}/${PREFIX}_recal.table" \
+    -O "${OUTDIR}/${PREFIX}_recal.bam" 2>&1 | tee "logs/${COV}x/applybqsr.log"
+  samtools index "${OUTDIR}/${PREFIX}_recal.bam"
+
+  # --- 3.5 Filter by mapping quality ---
+  samtools view -@ 4 -b -q 20 -F 1796 "${OUTDIR}/${PREFIX}_recal.bam" | \
+    samtools sort -@ 4 -o "${OUTDIR}/${PREFIX}_final.bam" -
+  samtools index "${OUTDIR}/${PREFIX}_final.bam"
+
+  # --- 3.6 Coverage stats ---
+  samtools stats "${OUTDIR}/${PREFIX}_final.bam" > "${OUTDIR}/${PREFIX}_stats.txt"
+  samtools flagstat "${OUTDIR}/${PREFIX}_final.bam" > "${OUTDIR}/${PREFIX}_flagstat.txt"
+  mosdepth -t 4 --by 1000 "${OUTDIR}/${PREFIX}_coverage" "${OUTDIR}/${PREFIX}_final.bam"
+
+  # --- 3.7 Export BAM path ---
+  echo "FINAL_BAM=${OUTDIR}/${PREFIX}_final.bam" > "${OUTDIR}/bam_path.sh"
+
+  echo "Done: ${OUTDIR}/${PREFIX}_final.bam"
+done
 ```
 
-Output: `results/preprocessing/SIMULATED_SAMPLE_chr22_aligned.bam` (+`.bai`) — BAM đã sorted
+Output (per coverage level `{COV}x`):
+- `results/preprocessing/{COV}x/SIMULATED_SAMPLE_chr22_final.bam` — BAM cuối cùng
+- `results/preprocessing/{COV}x/bam_path.sh` — export path cho downstream scripts
 
-#### 3.3. GATK MarkDuplicates
+### Phần IV. Gọi biến thể — Multi-coverage, WGS + WES
+
+Chạy tất cả caller cho mỗi mức coverage. WGS callers cho mọi coverage,
+WES callers cho coverage phù hợp (50x, 100x, 200x).
+
+#### 4.1 WGS Variant Calling
 
 ```bash
-gatk MarkDuplicates \
-  --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
-  -I results/preprocessing/SIMULATED_SAMPLE_chr22_aligned.bam \
-  -O results/preprocessing/SIMULATED_SAMPLE_chr22_marked.bam \
-  -M results/preprocessing/SIMULATED_SAMPLE_chr22_dup_metrics.txt \
-  --VALIDATION_STRINGENCY SILENT \
-  --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 \
-  --CREATE_INDEX true \
-  2>&1 | tee logs/markduplicates.log
+# pwd: variant-benchmarking
+
+for COV in 10 20 30 50 100 200; do
+  echo "=== Variant Calling: ${COV}x WGS ==="
+  export PREPROC_DIR="results/preprocessing/${COV}x"
+  export VARIANT_DIR="results/variants/${COV}x"
+  export LOG_DIR="logs/${COV}x"
+  mkdir -p "${VARIANT_DIR}"/{gatk,deepvariant,strelka2,freebayes,dnascope}
+  mkdir -p "${LOG_DIR}/time"
+
+  source "${PREPROC_DIR}/bam_path.sh"
+
+  bash pipelines/03_call_hc.sh                   # GATK HC (3 filters)
+  bash pipelines/04_call_dv.sh                    # DeepVariant
+  bash pipelines/05_call_strelka.sh               # Strelka2 (with Manta)
+  bash pipelines/06_call_freebayes.sh             # FreeBayes
+  bash pipelines/07_call_dnascope.sh              # DNAscope (optional)
+done
 ```
 
-Output:
-- `results/preprocessing/SIMULATED_SAMPLE_chr22_marked.bam` (+`.bai`) — BAM đã đánh dấu duplicates
-- `results/preprocessing/SIMULATED_SAMPLE_chr22_dup_metrics.txt` — thống kê duplicates
-
-#### 3.4. GATK BaseRecalibrator & ApplyBQSR
+#### 4.2 WES Variant Calling (coverage ≥ 50x)
 
 ```bash
-# Ensure known-sites VCFs match the "chr" naming convention if needed.
-# If your VCFs use "22" instead of "chr22", run:
-# scripts/rename_chromosomes.sh <input.vcf.gz> <output.vcf.gz>
+# pwd: variant-benchmarking
 
-gatk BaseRecalibrator \
-  --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
-  -R data/reference/chr22.fa \
-  -I results/preprocessing/SIMULATED_SAMPLE_chr22_marked.bam \
-  --known-sites data/reference/dbsnp138.hg38.chr22.vcf.gz \
-  --known-sites data/reference/Mills_and_1000G_gold_standard.indels.hg38.chr22.vcf.gz \
-  --known-sites data/reference/1000G_phase1.snps.high_confidence.hg38.chr22.vcf.gz \
-  -O results/preprocessing/SIMULATED_SAMPLE_chr22_recal.table \
-  2>&1 | tee logs/baserecalibrator.log
+for COV in 50 100 200; do
+  echo "=== Variant Calling: ${COV}x WES ==="
+  export PREPROC_DIR="results/preprocessing/${COV}x"
+  export VARIANT_DIR="results/variants/${COV}x"
+  export LOG_DIR="logs/${COV}x"
+  mkdir -p "${VARIANT_DIR}"/{gatk_wes,deepvariant_wes,strelka2_wes,freebayes_wes,dnascope_wes}
 
-gatk ApplyBQSR \
-  --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
-  -R data/reference/chr22.fa \
-  -I results/preprocessing/SIMULATED_SAMPLE_chr22_marked.bam \
-  --bqsr-recal-file results/preprocessing/SIMULATED_SAMPLE_chr22_recal.table \
-  -O results/preprocessing/SIMULATED_SAMPLE_chr22_recal.bam \
-  2>&1 | tee logs/applybqsr.log
+  source "${PREPROC_DIR}/bam_path.sh"
 
-samtools index results/preprocessing/SIMULATED_SAMPLE_chr22_recal.bam
+  bash pipelines/03_call_hc_wes.sh               # GATK HC WES
+  bash pipelines/04_call_dv_wes.sh                # DeepVariant WES
+  bash pipelines/05_call_strelka_wes.sh           # Strelka2 WES (with Manta --exome)
+  bash pipelines/06_call_freebayes_wes.sh         # FreeBayes WES
+  bash pipelines/07_call_dnascope_wes.sh          # DNAscope WES (optional)
+done
 ```
 
-Output:
-- `results/preprocessing/SIMULATED_SAMPLE_chr22_recal.table` — bảng recalibration
-- `results/preprocessing/SIMULATED_SAMPLE_chr22_recal.bam` (+`.bai`) — BAM sau BQSR
+Output per coverage:
+- `results/variants/{COV}x/gatk/` — GATK HC (3 filter strategies)
+- `results/variants/{COV}x/deepvariant/` — DeepVariant
+- `results/variants/{COV}x/strelka2/` — Strelka2 (with Manta indel candidates)
+- `results/variants/{COV}x/freebayes/` — FreeBayes
+- `results/variants/{COV}x/dnascope/` — DNAscope (optional, needs Sentieon license)
+- `results/variants/{COV}x/*_wes/` — WES mode scripts (same but with exome targets)
 
-#### 3.5. Filter by mapping quality
-
-```bash
-samtools view \
-  -@ 4 \
-  -b \
-  -q 20 \
-  -F 1796 \
-  results/preprocessing/SIMULATED_SAMPLE_chr22_recal.bam | \
-  samtools sort -@ 4 -o results/preprocessing/SIMULATED_SAMPLE_chr22_final.bam -
-
-samtools index results/preprocessing/SIMULATED_SAMPLE_chr22_final.bam
-```
-
-Output: `results/preprocessing/SIMULATED_SAMPLE_chr22_final.bam` (+`.bai`) — BAM cuối cùng (MQ ≥ 20)
-
-#### 3.6 Alignment statistics (samtools stats, mosdepth)
-
-```bash
-samtools stats results/preprocessing/SIMULATED_SAMPLE_chr22_final.bam \
-  > results/preprocessing/SIMULATED_SAMPLE_chr22_stats.txt
-samtools flagstat results/preprocessing/SIMULATED_SAMPLE_chr22_final.bam \
-  > results/preprocessing/SIMULATED_SAMPLE_chr22_flagstat.txt
-samtools idxstats results/preprocessing/SIMULATED_SAMPLE_chr22_final.bam \
-  > results/preprocessing/SIMULATED_SAMPLE_chr22_idxstats.txt
-
-# mosdepth for coverage
-mosdepth -t 4 --by 1000 \
-  results/preprocessing/SIMULATED_SAMPLE_chr22_coverage \
-  results/preprocessing/SIMULATED_SAMPLE_chr22_final.bam
-```
-
-Output:
-- `results/preprocessing/SIMULATED_SAMPLE_chr22_stats.txt` — alignment statistics
-- `results/preprocessing/SIMULATED_SAMPLE_chr22_flagstat.txt` — flag statistics
-- `results/preprocessing/SIMULATED_SAMPLE_chr22_idxstats.txt` — per-chromosome counts
-- `results/preprocessing/SIMULATED_SAMPLE_chr22_coverage.*` — coverage by mosdepth
-
-#### 3.7 Export for downstream scripts
-
-```bash
-echo "FINAL_BAM=results/preprocessing/SIMULATED_SAMPLE_chr22_final.bam" > results/preprocessing/bam_path.sh
-```
-
-### Phần IV. Gọi biến thể
-
-```bash
-#pwd: variant-benchmarking
-
-bash stages/03_variant_calling_gatk.sh
-bash stages/04_variant_calling_deepvariant.sh
-bash stages/05_variant_calling_strelka2.sh
-bash stages/06_variant_calling_freebayes.sh
-```
-
-Output:
-- `results/variants/gatk/*_gatk_pass.norm.vcf.gz` — GATK HaplotypeCaller
-- `results/variants/deepvariant/*_deepvariant_pass.norm.vcf.gz` — DeepVariant
-- `results/variants/strelka2/*_strelka2_pass.norm.vcf.gz` — Strelka2
-- `results/variants/freebayes/*_freebayes_pass.norm.vcf.gz` — FreeBayes
+> **Callers:** 5 callers × (WGS + WES) = 10 pipelines per coverage level
+> **Total VCFs:** 6 coverages × WGS (5) + 3 coverages × WES (5) = 45+ VCFs
 
 ### Phần V. So sánh các công cụ gọi biến thể bằng RTG Tools VCFEval 
 
@@ -457,11 +516,14 @@ Output per caller (`results/benchmarks/rtg_vcfeval/{caller}/`):
 #### 5.2 Hợp nhất các file output fn/fp/tp-callset/tp-baseline sau khi dùng rtgtool/vcfeval của 4 công cụ gọi biến thể
 
 ``` bash
+# pwd: variant-benchmarking
+
 OUTDIR=results/benchmarks/rtg_vcfeval/merged
 mkdir -p "$OUTDIR"
 ```
 
 ```bash
+# pwd: variant-benchmarking
 # FN
 
 FN_GATK=$(ls results/benchmarks/rtg_vcfeval/gatk/*fn*.vcf.gz | head -n 1)
@@ -491,6 +553,7 @@ tabix -f -p vcf "$OUTDIR/fn_4callers.vcf.gz"
 ```
 
 ```bash
+# pwd: variant-benchmarking
 # FP
 
 FP_GATK=$(ls results/benchmarks/rtg_vcfeval/gatk/*fp*.vcf.gz | head -n 1)
@@ -520,6 +583,7 @@ tabix -f -p vcf "$OUTDIR/fp_4callers.vcf.gz"
 ```
 
 ```bash
+# pwd: variant-benchmarking
 # TP_CALLSET (TP này là TP_callset, không phải baseline)
 
 TP_GATK=$(ls results/benchmarks/rtg_vcfeval/gatk/*tp*.vcf.gz | grep -v baseline | head -n 1)
@@ -549,6 +613,7 @@ tabix -f -p vcf "$OUTDIR/tp_callset_4callers.vcf.gz"
 ```
 
 ```bash
+# pwd: variant-benchmarking
 # TP_BASELINE
 
 TPB_GATK=$(ls results/benchmarks/rtg_vcfeval/gatk/*tp-baseline*.vcf.gz | head -n 1)
@@ -586,6 +651,7 @@ Output (`results/benchmarks/rtg_vcfeval/merged/`):
 ### 5.3 Chuyển file VCF sang CSV để phục vụ cho công đoạn xử lý dữ liệu và trực quan hoá
 
 ```bash
+# pwd: variant-benchmarking
 # FN
 
 IN=results/benchmarks/rtg_vcfeval/merged/fn_4callers.vcf.gz
@@ -596,6 +662,7 @@ bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n' "$IN" | tr '\t' ',' >> "$O
 ```
 
 ```bash
+# pwd: variant-benchmarking
 # FP
 
 IN=results/benchmarks/rtg_vcfeval/merged/fp_4callers.vcf.gz
@@ -606,6 +673,7 @@ bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n' "$IN" | tr '\t' ',' >> "$O
 ```
 
 ```bash
+# pwd: variant-benchmarking
 # TP_CALLSET
 
 IN=results/benchmarks/rtg_vcfeval/merged/tp_callset_4callers.vcf.gz
@@ -617,6 +685,7 @@ bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n' "$IN" | tr '\t' ',' >> "$O
 
 
 ```bash
+# pwd: variant-benchmarking
 # TP_BASELINE
 
 IN=results/benchmarks/rtg_vcfeval/merged/tp_baseline_4callers.vcf.gz
@@ -640,32 +709,31 @@ Bên cạnh các metric cổ điển (Precision/Recall/F1), phần này bổ sun
 - **Lớp 1 — SnpEff + ACMG**: phân loại lỗi theo impact (HIGH/MODERATE/LOW/MODIFIER) và phân loại lâm sàng (P/LP/VUS/LB/B)
 - **Lớp 2 — AlphaGenome**: chấm điểm tác động chức năng bằng deep learning, đặc biệt mạnh với biến thể novel và non-coding
 
-#### 6.1. Cài đặt SnpEff, SnpSift và cơ sở dữ liệu
+#### 6.1. Chuẩn bị cơ sở dữ liệu cho SnpEff / SnpSift
 
 ```bash
-# Download SnpEff + SnpSift
-cd $HOME
-wget https://snpeff.blob.core.windows.net/versions/snpEff_latest_core.zip
-unzip snpEff_latest_core.zip
+# pwd: variant-benchmarking
 
 # Download database GRCh38
-java -jar $HOME/snpEff/snpEff.jar download GRCh38.105
+java -jar snpEff.jar download GRCh38.mane.1.0.ensembl
 
 # Download dbNSFP (SIFT, PolyPhen2, PROVEAN, MutationTaster, CADD, MetaLR)
-cd $HOME/snpEff/data
-wget https://snpeff.blob.core.windows.net/databases/dbs/GRCh38/dbNSFP4.4a/dbNSFP4.4a.txt.gz
-wget https://snpeff.blob.core.windows.net/databases/dbs/GRCh38/dbNSFP4.4a/dbNSFP4.4a.txt.gz.tbi
+wget -P data/snpeff/data https://dbnsfp.s3.amazonaws.com/dbNSFP4.9a.zip
 
-# Trích chr22 để giảm dung lượng (~500MB thay vì 30GB)
-zcat dbNSFP4.4a.txt.gz | head -1 | bgzip > dbNSFP4.4a.chr22.txt.gz
-tabix dbNSFP4.4a.txt.gz 22 | bgzip >> dbNSFP4.4a.chr22.txt.gz
-tabix -s 1 -b 2 -e 2 dbNSFP4.4a.chr22.txt.gz
-rm dbNSFP4.4a.txt.gz dbNSFP4.4a.txt.gz.tbi
+# Trích chr22 từ file zip (header + dữ liệu chr22), không cần giải nén toàn bộ
+unzip -p data/snpeff/data/dbNSFP4.9a.zip dbNSFP4.9a_variant.chr22.gz \
+  | zcat | head -1 | bgzip > data/snpeff/data/dbNSFP4.9a.chr22.txt.gz
+unzip -p data/snpeff/data/dbNSFP4.9a.zip dbNSFP4.9a_variant.chr22.gz \
+  | zcat | sed 1d | bgzip >> data/snpeff/data/dbNSFP4.9a.chr22.txt.gz
+tabix -s 1 -b 2 -e 2 data/snpeff/data/dbNSFP4.9a.chr22.txt.gz
+
+# Xoá file zip gốc (~35GB)
+rm data/snpeff/data/dbNSFP4.9a.zip
 
 # Download ClinVar
-mkdir -p $HOME/snpEff/data/clinvar && cd $HOME/snpEff/data/clinvar
-wget https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz
-wget https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz.tbi
+mkdir -p data/snpeff/data/clinvar
+wget -P data/snpeff/data/clinvar https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz
+wget -P data/snpeff/data/clinvar https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz.tbi
 ```
 
 #### 6.2. Chú giải biến thể bằng SnpEff + SnpSift
