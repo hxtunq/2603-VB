@@ -87,7 +87,7 @@ rm -f 1000G_phase1.snps.high_confidence.hg38.vcf.gz 1000G_phase1.snps.high_confi
 ```bash
 # pwd: variant-benchmarking/data/reference
 
-# tạo file BED chứa vùng non-N của chromosome (dùng cho VCFeval --bed-regions)
+# tạo file BED chứa vùng non-N của chromosome
 python3 << 'EOF'
 from Bio import SeqIO
 import re
@@ -109,11 +109,23 @@ print("Done")
 EOF
 ```
 
+```bash
+# pwd: variant-benchmarking/data/reference
+
+# Tạo high-confidence BED = non-N regions trừ đi vùng low-mappability
+# Dùng làm confident region (-f) cho hap.py
+bedtools subtract \
+    -a chr22_non_N_regions.bed \
+    -b umap_k100_mappability.chr22.bed.gz \
+    > chr22_highconf.bed
+```
+
 Output:
 - `data/reference/dbsnp138.hg38.chr22.vcf.gz` (+`.tbi`) — dbSNP chr22
 - `data/reference/Mills_and_1000G_gold_standard.indels.hg38.chr22.vcf.gz` (+`.tbi`) — Mills indels chr22
 - `data/reference/1000G_phase1.snps.high_confidence.hg38.chr22.vcf.gz` (+`.tbi`) — 1000G SNPs chr22
-- `data/reference/chr22_non_N_regions.bed` — vùng non-N cho VCFeval
+- `data/reference/chr22_non_N_regions.bed` — vùng non-N
+- `data/reference/chr22_highconf.bed` — high-confidence region (non-N − low-mappability) cho hap.py
 
 #### 2.3. Tạo đột biến SNPs và INDELs với simuG
 
@@ -508,290 +520,36 @@ Output per coverage:
 > **Callers:** 5 callers × (WGS + WES) = 10 pipelines per coverage level
 > **Total VCFs:** 4 coverages × WGS (5) + 2 coverages × WES (5) = 30+ VCFs
 
-### Phần V. So sánh các công cụ gọi biến thể bằng RTG Tools VCFEval 
+### Phần V. Đánh giá kết quả gọi biến thể bằng hap.py
 
-#### 5.1 Chạy VCFeval cho 4 file VCF output của 4 công cụ gọi biến thể sau khi gọi biến thể
+Sử dụng [hap.py](https://github.com/Illumina/hap.py) (via Docker) để so sánh kết quả variant calling với truth VCF.
+hap.py tích hợp sẵn vcfeval engine và tính Precision, Recall, F1 cho cả SNP và INDEL.
 
-```bash
-# pwd: variant-benchmarking
+- **WGS:** đánh giá trên toàn bộ high-confidence region (`-f chr22_highconf.bed`)
+- **WES:** thu hẹp thêm vào exome targets (`-T Exome-Agilent_V6.chr22.bed`)
+- **Stratification:** phân tầng kết quả theo CDS, Exome, Low-mappability (nếu có `stratification_chr22.tsv`)
 
-# khai báo đường dẫn
-BED=data/reference/chr22_non_N_regions.bed
-REF=data/reference/chr22.fa
-TRUTH_RAW=$(ls -1 data/simulated/*_truth.vcf.gz | head -n 1)
-
-mkdir -p results/benchmarks/truth
-rm -f results/benchmarks/truth/truth.gt.vcf.gz* results/benchmarks/truth/truth.gt.norm.vcf.gz*
-
-# Tạo truth có FORMAT+GT hợp lệ (có khai báo ##FORMAT cho GT)
-zcat "$TRUTH_RAW" | awk 'BEGIN{OFS="\t"; ff=0}
-  /^##fileformat=/ {ff=1; print; next}
-  /^##/ {print; next}
-  /^#CHROM/ {
-    if(ff==0) print "##fileformat=VCFv4.2"
-    print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">"
-    print $0,"FORMAT","TRUTH"
-    next
-  }
-  {print $0,"GT","1/1"}
-' | bgzip -c > results/benchmarks/truth/truth.gt.vcf.gz
-
-tabix -f -p vcf results/benchmarks/truth/truth.gt.vcf.gz
-
-# Normalize lại truth (có GT) để dùng cho vcfeval
-bcftools norm -f "$REF" -m -both results/benchmarks/truth/truth.gt.vcf.gz -Oz \
-  -o results/benchmarks/truth/truth.gt.norm.vcf.gz
-
-tabix -f -p vcf results/benchmarks/truth/truth.gt.norm.vcf.gz
-
-# tạo SDF template cho RTG
-rtg format -o results/benchmarks/ref/chr22.sdf "$REF"
-# check
-bcftools query -l results/benchmarks/truth/truth.gt.norm.vcf.gz
-```
-
-```bash
-#pwd: variant-benchmarking
-QUERY=$(ls -1 results/variants/gatk/*_gatk_pass.norm.vcf.gz | head -n 1)
-RTG_MEM=14G rtg vcfeval \
-  --baseline results/benchmarks/truth/truth.gt.norm.vcf.gz \
-  --calls "$QUERY" \
-  --template results/benchmarks/ref/chr22.sdf \
-  --bed-regions "$BED" \
-  --output results/benchmarks/rtg_vcfeval/gatk \
-  --threads 4
-```
-
-```bash
-#pwd: variant-benchmarking
-QUERY=$(ls -1 results/variants/deepvariant/*_deepvariant_pass.norm.vcf.gz | head -n 1)
-RTG_MEM=14G rtg vcfeval \
-  --baseline results/benchmarks/truth/truth.gt.norm.vcf.gz \
-  --calls "$QUERY" \
-  --template results/benchmarks/ref/chr22.sdf \
-  --bed-regions "$BED" \
-  --output results/benchmarks/rtg_vcfeval/deepvariant \
-  --threads 4
-```
-
-```bash
-#pwd: variant-benchmarking
-QUERY=$(ls -1 results/variants/strelka2/*_strelka2_pass.norm.vcf.gz | head -n 1)
-RTG_MEM=14G rtg vcfeval \
-  --baseline results/benchmarks/truth/truth.gt.norm.vcf.gz \
-  --calls "$QUERY" \
-  --template results/benchmarks/ref/chr22.sdf \
-  --bed-regions "$BED" \
-  --output results/benchmarks/rtg_vcfeval/strelka2 \
-  --threads 4
-```
-
-```bash
-#pwd: variant-benchmarking
-QUERY=$(ls -1 results/variants/freebayes/*_freebayes_pass.norm.vcf.gz | head -n 1)
-RTG_MEM=14G rtg vcfeval \
-  --baseline results/benchmarks/truth/truth.gt.norm.vcf.gz \
-  --calls "$QUERY" \
-  --template results/benchmarks/ref/chr22.sdf \
-  --bed-regions "$BED" \
-  --output results/benchmarks/rtg_vcfeval/freebayes \
-  --threads 4
-```
-
-Output per caller (`results/benchmarks/rtg_vcfeval/{caller}/`):
-- `tp.vcf.gz` — True Positives (callset)
-- `tp-baseline.vcf.gz` — True Positives (baseline)
-- `fn.vcf.gz` — False Negatives
-- `fp.vcf.gz` — False Positives
-- `summary.txt` — Precision, Recall, F-measure
-
-#### 5.2 Hợp nhất các file output fn/fp/tp-callset/tp-baseline sau khi dùng rtgtool/vcfeval của 4 công cụ gọi biến thể
-
-``` bash
-# pwd: variant-benchmarking
-
-OUTDIR=results/benchmarks/rtg_vcfeval/merged
-mkdir -p "$OUTDIR"
-```
+#### 5.1 Chạy hap.py cho tất cả callers × coverages
 
 ```bash
 # pwd: variant-benchmarking
-# FN
-
-FN_GATK=$(ls results/benchmarks/rtg_vcfeval/gatk/*fn*.vcf.gz | head -n 1)
-FN_DV=$(ls results/benchmarks/rtg_vcfeval/deepvariant/*fn*.vcf.gz | head -n 1)
-FN_ST=$(ls results/benchmarks/rtg_vcfeval/strelka2/*fn*.vcf.gz | head -n 1)
-FN_FB=$(ls results/benchmarks/rtg_vcfeval/freebayes/*fn*.vcf.gz | head -n 1)
-
-for X in gatk:"$FN_GATK" deepvariant:"$FN_DV" strelka2:"$FN_ST" freebayes:"$FN_FB"; do
-  S=${X%%:*}; IN=${X#*:}
-  zcat "$IN" | awk -v s="$S" 'BEGIN{OFS="\t"; gt=0}
-    /^##FORMAT=<ID=GT/ {gt=1}
-    /^##/ {print; next}
-    /^#CHROM/ {
-      if(!gt) print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">"
-      print "#CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO","FORMAT",s
-      next
-    }
-    {print $1,$2,$3,$4,$5,$6,$7,$8,"GT","1/1"}
-  ' | bgzip -c > "$OUTDIR/$S.fn.vcf.gz"
-  tabix -f -p vcf "$OUTDIR/$S.fn.vcf.gz"
-done
-
-bcftools merge -m none -Oz -o "$OUTDIR/fn_4callers.vcf.gz" \
-  "$OUTDIR/gatk.fn.vcf.gz" "$OUTDIR/deepvariant.fn.vcf.gz" \
-  "$OUTDIR/strelka2.fn.vcf.gz" "$OUTDIR/freebayes.fn.vcf.gz"
-tabix -f -p vcf "$OUTDIR/fn_4callers.vcf.gz"
+bash evaluation/eval_happy.sh
 ```
+
+Script tự động lặp qua:
+- WGS: 10x, 20x, 30x, 50x × 5 callers (gatk, deepvariant, strelka2, freebayes, dnascope)
+- WES: 100x, 200x × 5 callers (gatk_wes, deepvariant_wes, strelka2_wes, freebayes_wes, dnascope_wes)
+
+Output per caller: `results/eval/{COV}x/{WGS|WES}/{caller}_eval_data/report.*`
+
+#### 5.2 Tổng hợp thống kê vào file TSV
 
 ```bash
 # pwd: variant-benchmarking
-# FP
-
-FP_GATK=$(ls results/benchmarks/rtg_vcfeval/gatk/*fp*.vcf.gz | head -n 1)
-FP_DV=$(ls results/benchmarks/rtg_vcfeval/deepvariant/*fp*.vcf.gz | head -n 1)
-FP_ST=$(ls results/benchmarks/rtg_vcfeval/strelka2/*fp*.vcf.gz | head -n 1)
-FP_FB=$(ls results/benchmarks/rtg_vcfeval/freebayes/*fp*.vcf.gz | head -n 1)
-
-for X in gatk:"$FP_GATK" deepvariant:"$FP_DV" strelka2:"$FP_ST" freebayes:"$FP_FB"; do
-  S=${X%%:*}; IN=${X#*:}
-  zcat "$IN" | awk -v s="$S" 'BEGIN{OFS="\t"; gt=0}
-    /^##FORMAT=<ID=GT/ {gt=1}
-    /^##/ {print; next}
-    /^#CHROM/ {
-      if(!gt) print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">"
-      print "#CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO","FORMAT",s
-      next
-    }
-    {print $1,$2,$3,$4,$5,$6,$7,$8,"GT","1/1"}
-  ' | bgzip -c > "$OUTDIR/$S.fp.vcf.gz"
-  tabix -f -p vcf "$OUTDIR/$S.fp.vcf.gz"
-done
-
-bcftools merge -m none -Oz -o "$OUTDIR/fp_4callers.vcf.gz" \
-  "$OUTDIR/gatk.fp.vcf.gz" "$OUTDIR/deepvariant.fp.vcf.gz" \
-  "$OUTDIR/strelka2.fp.vcf.gz" "$OUTDIR/freebayes.fp.vcf.gz"
-tabix -f -p vcf "$OUTDIR/fp_4callers.vcf.gz"
+bash evaluation/gather_stats.sh
 ```
 
-```bash
-# pwd: variant-benchmarking
-# TP_CALLSET (TP này là TP_callset, không phải baseline)
-
-TP_GATK=$(ls results/benchmarks/rtg_vcfeval/gatk/*tp*.vcf.gz | grep -v baseline | head -n 1)
-TP_DV=$(ls results/benchmarks/rtg_vcfeval/deepvariant/*tp*.vcf.gz | grep -v baseline | head -n 1)
-TP_ST=$(ls results/benchmarks/rtg_vcfeval/strelka2/*tp*.vcf.gz | grep -v baseline | head -n 1)
-TP_FB=$(ls results/benchmarks/rtg_vcfeval/freebayes/*tp*.vcf.gz | grep -v baseline | head -n 1)
-
-for X in gatk:"$TP_GATK" deepvariant:"$TP_DV" strelka2:"$TP_ST" freebayes:"$TP_FB"; do
-  S=${X%%:*}; IN=${X#*:}
-  zcat "$IN" | awk -v s="$S" 'BEGIN{OFS="\t"; gt=0}
-    /^##FORMAT=<ID=GT/ {gt=1}
-    /^##/ {print; next}
-    /^#CHROM/ {
-      if(!gt) print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">"
-      print "#CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO","FORMAT",s
-      next
-    }
-    {print $1,$2,$3,$4,$5,$6,$7,$8,"GT","1/1"}
-  ' | bgzip -c > "$OUTDIR/$S.tp_callset.vcf.gz"
-  tabix -f -p vcf "$OUTDIR/$S.tp_callset.vcf.gz"
-done
-
-bcftools merge -m none -Oz -o "$OUTDIR/tp_callset_4callers.vcf.gz" \
-  "$OUTDIR/gatk.tp_callset.vcf.gz" "$OUTDIR/deepvariant.tp_callset.vcf.gz" \
-  "$OUTDIR/strelka2.tp_callset.vcf.gz" "$OUTDIR/freebayes.tp_callset.vcf.gz"
-tabix -f -p vcf "$OUTDIR/tp_callset_4callers.vcf.gz"
-```
-
-```bash
-# pwd: variant-benchmarking
-# TP_BASELINE
-
-TPB_GATK=$(ls results/benchmarks/rtg_vcfeval/gatk/*tp-baseline*.vcf.gz | head -n 1)
-TPB_DV=$(ls results/benchmarks/rtg_vcfeval/deepvariant/*tp-baseline*.vcf.gz | head -n 1)
-TPB_ST=$(ls results/benchmarks/rtg_vcfeval/strelka2/*tp-baseline*.vcf.gz | head -n 1)
-TPB_FB=$(ls results/benchmarks/rtg_vcfeval/freebayes/*tp-baseline*.vcf.gz | head -n 1)
-
-for X in gatk:"$TPB_GATK" deepvariant:"$TPB_DV" strelka2:"$TPB_ST" freebayes:"$TPB_FB"; do
-  S=${X%%:*}; IN=${X#*:}
-  zcat "$IN" | awk -v s="$S" 'BEGIN{OFS="\t"; gt=0}
-    /^##FORMAT=<ID=GT/ {gt=1}
-    /^##/ {print; next}
-    /^#CHROM/ {
-      if(!gt) print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">"
-      print "#CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO","FORMAT",s
-      next
-    }
-    {print $1,$2,$3,$4,$5,$6,$7,$8,"GT","1/1"}
-  ' | bgzip -c > "$OUTDIR/$S.tp_baseline.vcf.gz"
-  tabix -f -p vcf "$OUTDIR/$S.tp_baseline.vcf.gz"
-done
-
-bcftools merge -m none -Oz -o "$OUTDIR/tp_baseline_4callers.vcf.gz" \
-  "$OUTDIR/gatk.tp_baseline.vcf.gz" "$OUTDIR/deepvariant.tp_baseline.vcf.gz" \
-  "$OUTDIR/strelka2.tp_baseline.vcf.gz" "$OUTDIR/freebayes.tp_baseline.vcf.gz"
-tabix -f -p vcf "$OUTDIR/tp_baseline_4callers.vcf.gz"
-```
-
-Output (`results/benchmarks/rtg_vcfeval/merged/`):
-- `fn_4callers.vcf.gz` — FN hợp nhất 4 caller
-- `fp_4callers.vcf.gz` — FP hợp nhất 4 caller
-- `tp_callset_4callers.vcf.gz` — TP callset hợp nhất
-- `tp_baseline_4callers.vcf.gz` — TP baseline hợp nhất
-
-### 5.3 Chuyển file VCF sang CSV để phục vụ cho công đoạn xử lý dữ liệu và trực quan hoá
-
-```bash
-# pwd: variant-benchmarking
-# FN
-
-IN=results/benchmarks/rtg_vcfeval/merged/fn_4callers.vcf.gz
-OUT=results/benchmarks/rtg_vcfeval/merged/fn_4callers.csv
-
-echo "CHROM,POS,REF,ALT,$(bcftools query -l "$IN" | paste -sd, -)" > "$OUT"
-bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n' "$IN" | tr '\t' ',' >> "$OUT"
-```
-
-```bash
-# pwd: variant-benchmarking
-# FP
-
-IN=results/benchmarks/rtg_vcfeval/merged/fp_4callers.vcf.gz
-OUT=results/benchmarks/rtg_vcfeval/merged/fp_4callers.csv
-
-echo "CHROM,POS,REF,ALT,$(bcftools query -l "$IN" | paste -sd, -)" > "$OUT"
-bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n' "$IN" | tr '\t' ',' >> "$OUT"
-```
-
-```bash
-# pwd: variant-benchmarking
-# TP_CALLSET
-
-IN=results/benchmarks/rtg_vcfeval/merged/tp_callset_4callers.vcf.gz
-OUT=results/benchmarks/rtg_vcfeval/merged/tp_callset_4callers.csv
-
-echo "CHROM,POS,REF,ALT,$(bcftools query -l "$IN" | paste -sd, -)" > "$OUT"
-bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n' "$IN" | tr '\t' ',' >> "$OUT"
-```
-
-
-```bash
-# pwd: variant-benchmarking
-# TP_BASELINE
-
-IN=results/benchmarks/rtg_vcfeval/merged/tp_baseline_4callers.vcf.gz
-OUT=results/benchmarks/rtg_vcfeval/merged/tp_baseline_4callers.csv
-
-echo "CHROM,POS,REF,ALT,$(bcftools query -l "$IN" | paste -sd, -)" > "$OUT"
-bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n' "$IN" | tr '\t' ',' >> "$OUT"
-```
-
-Output (`results/benchmarks/rtg_vcfeval/merged/`):
-- `fn_4callers.csv` — FN dạng CSV
-- `fp_4callers.csv` — FP dạng CSV
-- `tp_callset_4callers.csv` — TP callset dạng CSV
-- `tp_baseline_4callers.csv` — TP baseline dạng CSV
+Output: `results/eval/all_stats.tsv` — bảng tổng hợp với các cột: Coverage, Mode, Caller, + toàn bộ metrics từ hap.py report
 
 ### Phần VI. Đánh giá mức độ nguy hiểm của lỗi FN/FP (Functional Risk of Errors)
 
