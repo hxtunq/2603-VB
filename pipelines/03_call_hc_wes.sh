@@ -8,14 +8,14 @@ set -e
 COV="${1:?Usage: $0 <coverage>  (e.g. 10, 20, 30, 50, 100, 200)}"
 
 source "$(dirname "$0")/../config/config.sh"
-source "${PREPROC_DIR}/${COV}x/bam_path.sh"
+source "${PREPROC_DIR}/${COV}x_wes/bam_path.sh"
 
 CALLER="gatk_wes"
-OUT_DIR="${VARIANT_DIR}/${COV}x/${CALLER}"
-TIMEDIR="${LOG_DIR}/${COV}x/time"
+OUT_DIR="${VARIANT_DIR}/${COV}x_wes/${CALLER}"
+TIMEDIR="${LOG_DIR}/${COV}x_wes/time"
 mkdir -p "${OUT_DIR}" "${TIMEDIR}"
 
-METRICS="${LOG_DIR}/${COV}x/benchmark_metrics.tsv"
+METRICS="${LOG_DIR}/${COV}x_wes/benchmark_metrics.tsv"
 if [[ ! -f "${METRICS}" ]]; then
     echo -e "Caller\tPipeline\tWallClock_sec\tCPU_percent\tMaxRSS_kB" > "${METRICS}"
 fi

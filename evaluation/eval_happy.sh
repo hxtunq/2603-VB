@@ -39,7 +39,13 @@ function make_comparison()
     local COV="$3"
     local MODE="$4"  # WGS or WES
 
-    local EVAL_OUT="${EVAL_DIR}/${COV}x/${MODE}/${CALLER_NAME}_eval_data"
+    # Build coverage suffix: WGS → "50x", WES → "50x_wes"
+    local COV_SUFFIX="${COV}x"
+    if [[ "${MODE}" == "WES" ]]; then
+        COV_SUFFIX="${COV}x_wes"
+    fi
+
+    local EVAL_OUT="${EVAL_DIR}/${COV_SUFFIX}/${MODE}/${CALLER_NAME}_eval_data"
     mkdir -p "${EVAL_OUT}"
 
     echo "Evaluating: ${CALLER_NAME} @ ${COV}x (${MODE})"
@@ -76,7 +82,7 @@ function make_comparison()
         ${HAPPY_IMAGE} \
         /opt/hap.py/bin/hap.py \
         "/data/simulated/${PREFIX}_truth.vcf.gz" \
-        "/results/variants/${COV}x/${CALLER_NAME}/$(basename ${CURR_VCF})" \
+        "/results/variants/${COV_SUFFIX}/${CALLER_NAME}/$(basename ${CURR_VCF})" \
         -r "/ref/$(basename ${REF_FASTA})" \
         -f "/ref/$(basename ${TRUTH_BED})" \
         ${HAPPY_ARGS} \
@@ -113,7 +119,7 @@ done
 
 # WES evaluation — only high-coverage levels
 for COV in "${COVERAGES_WES[@]}"; do
-    VARIANT_DIR_COV="${RESULTS_DIR}/variants/${COV}x"
+    VARIANT_DIR_COV="${RESULTS_DIR}/variants/${COV}x_wes"
 
     for caller in ${WES_CALLERS}; do
         VCF=$(get_vcf "${caller}" "${VARIANT_DIR_COV}")

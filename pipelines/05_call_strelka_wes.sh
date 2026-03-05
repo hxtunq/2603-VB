@@ -8,14 +8,14 @@ set -e
 COV="${1:?Usage: $0 <coverage>  (e.g. 10, 20, 30, 50, 100, 200)}"
 
 source "$(dirname "$0")/../config/config.sh"
-source "${PREPROC_DIR}/${COV}x/bam_path.sh"
+source "${PREPROC_DIR}/${COV}x_wes/bam_path.sh"
 
 CALLER="strelka2_wes"
-OUT_DIR="${VARIANT_DIR}/${COV}x/${CALLER}"
-TIMEDIR="${LOG_DIR}/${COV}x/time"
+OUT_DIR="${VARIANT_DIR}/${COV}x_wes/${CALLER}"
+TIMEDIR="${LOG_DIR}/${COV}x_wes/time"
 mkdir -p "${OUT_DIR}"/{mantawd,strelkawd} "${TIMEDIR}"
 
-METRICS="${LOG_DIR}/${COV}x/benchmark_metrics.tsv"
+METRICS="${LOG_DIR}/${COV}x_wes/benchmark_metrics.tsv"
 if [[ ! -f "${METRICS}" ]]; then
     echo -e "Caller\tPipeline\tWallClock_sec\tCPU_percent\tMaxRSS_kB" > "${METRICS}"
 fi
@@ -39,7 +39,7 @@ if [[ ! -f "${EXOME_BED}" ]]; then
 fi
 
 ABS_REF_DIR=$(cd "${REF_DIR}" && pwd)
-ABS_PREPROC_DIR=$(cd "${PREPROC_DIR}/${COV}x" && pwd)
+ABS_PREPROC_DIR=$(cd "${PREPROC_DIR}/${COV}x_wes" && pwd)
 ABS_OUT_DIR=$(cd "${OUT_DIR}" && pwd)
 
 BAM_BASENAME=$(basename "${FINAL_BAM}")
