@@ -32,8 +32,7 @@ variant-calling-benchmark/
 │   └── config.sh                    # Cấu hình chung (resources, paths, params)
 │
 ├── pipelines/                       # Scripts gọi biến thể
-│   ├── 00_preprocess.sh             # BWA-MEM → sort → MarkDuplicates → stats
-│   ├── 03_call_hc.sh                # GATK HC (BQSR + CNN 1D/2D + Hard Filter)
+│   ├── 03_call_hc.sh                # GATK HC (BQSR + Hard Filter)
 │   ├── 03_call_hc_wes.sh            # GATK HC — WES mode (-L exome BED)
 │   ├── 04_call_dv.sh                # DeepVariant WGS
 │   ├── 04_call_dv_wes.sh            # DeepVariant WES (--model_type=WES)
@@ -60,7 +59,7 @@ variant-calling-benchmark/
 
 | # | Caller | WGS | WES | Filter strategy |
 |---|--------|-----|-----|-----------------|
-| 1 | **GATK HaplotypeCaller** | ✅ | ✅ | CNN 1D, CNN 2D, Hard Filter |
+| 1 | **GATK HaplotypeCaller** | ✅ | ✅ | Hard Filter (GATK Best Practices) |
 | 2 | **DeepVariant** v1.9.0 | ✅ | ✅ | Default (model-based) |
 | 3 | **Strelka2** v2.9.10 | ✅ | ✅ | Default (with Manta indel candidates) |
 | 4 | **FreeBayes** v1.3.10 | ✅ | ✅ | QUAL + strand bias filters |
@@ -125,7 +124,7 @@ for cov in 10 20 30 50; do
 done
 
 # WES coverages
-for cov in 100 200; do
+for cov in 50 100 200; do
     bash pipelines/03_call_hc_wes.sh $cov
 done
 ```

@@ -298,7 +298,7 @@ bedtools getfasta \
     -fo "${SIM_DIR}/${PREFIX}_exome.fa"
 
 # WES: coverage cao, chỉ trên vùng exome
-for COV in 100 200; do
+for COV in 50 100 200; do
   echo "=== WES: Generating ${COV}x coverage ==="
 
   art_illumina \
@@ -367,7 +367,7 @@ for COV in 10 20 30 50; do
 done
 
 # === WES (100x, 200x) — reads từ vùng exome, align lên toàn bộ chr22 ===
-for COV in 100 200; do
+for COV in 50 100 200; do
   echo "=== BWA-MEM WES: ${COV}x ==="
 
   R1="data/simulated/${PREFIX}_${COV}x_wes_R1.fastq.gz"
@@ -409,7 +409,7 @@ for COV in 10 20 30 50; do
 done
 
 # === WES ===
-for COV in 100 200; do
+for COV in 50 100 200; do
   echo "=== MarkDuplicates WES: ${COV}x ==="
   OUTDIR="results/preprocessing/${COV}x_wes"
 
@@ -449,7 +449,7 @@ for COV in 10 20 30 50; do
 done
 
 # === WES ===
-for COV in 100 200; do
+for COV in 50 100 200; do
   echo "=== Stats WES: ${COV}x ==="
   OUTDIR="results/preprocessing/${COV}x_wes"
 
@@ -465,7 +465,7 @@ for COV in 100 200; do
 done
 ```
 
-> Hoặc chạy gọn bằng script: `bash pipelines/00_preprocess.sh <coverage>`
+> Preprocessing đã được mô tả chi tiết trong các bước 3.1–3.3 ở trên.
 
 Output:
 - WGS: `results/preprocessing/{COV}x/` — BAM, stats, coverage (COV = 10, 20, 30, 50)
@@ -498,7 +498,7 @@ done
 ```bash
 # pwd: variant-benchmarking
 
-for COV in 100 200; do
+for COV in 50 100 200; do
   echo "=== Variant Calling: ${COV}x WES ==="
 
   bash pipelines/03_call_hc_wes.sh ${COV}          # GATK HC WES
