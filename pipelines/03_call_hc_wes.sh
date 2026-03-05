@@ -76,7 +76,7 @@ echo "=== Filter: Hard Filter (WES) ==="
 /usr/bin/time -v -o "${TIMEDIR}/hc_wes_filter_hard.time" bash -c "
     set -e
     gatk SelectVariants -V '${OUT_DIR}/${PREFIX}_HC.RAW.vcf' \
-        -select-type SNP -select-type MIXED \
+        -select-type SNP \
         -O '${OUT_DIR}/${PREFIX}.HC.snps.vcf'
 
     gatk VariantFiltration -V '${OUT_DIR}/${PREFIX}.HC.snps.vcf' \

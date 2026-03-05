@@ -84,6 +84,8 @@ function make_comparison()
         --threads ${THREADS} \
         --engine vcfeval \
         --engine-vcfeval-template "/ref/$(basename ${RTG_SDF})" \
+        --preprocess-truth \
+        --no-fixchr \
         -o "/output/report"
 
     echo "  Output: ${EVAL_OUT}/report.*"
@@ -110,7 +112,7 @@ for COV in "${COVERAGES_ALL[@]}"; do
 done
 
 # WES evaluation — only high-coverage levels
-for COV in "${COVERAGES_WES[@]}" 50; do
+for COV in "${COVERAGES_WES[@]}"; do
     VARIANT_DIR_COV="${RESULTS_DIR}/variants/${COV}x"
 
     for caller in ${WES_CALLERS}; do

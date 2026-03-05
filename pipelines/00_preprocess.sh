@@ -16,9 +16,9 @@
 
 set -e
 
-source "$(dirname "$0")/../config/config.sh"
-
 COV="${1:?Usage: $0 <coverage>  (e.g. 10, 20, 30, 50, 100, 200)}"
+
+source "$(dirname "$0")/../config/config.sh"
 
 echo "============================================"
 echo "Preprocessing: ${COV}x coverage"

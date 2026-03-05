@@ -71,7 +71,7 @@ export INDEL_MAX_LEN=30         # Up to 30bp to test longer indels
 # WGS coverages: low to medium (like GIAB WGS 22-37x)
 # Higher coverages: for WES-like evaluation (GIAB WES 183-249x)
 export COVERAGES_WGS=(10 20 30 50)
-export COVERAGES_WES=(100 200)
+export COVERAGES_WES=(50 100 200)
 export COVERAGES_ALL=(10 20 30 50 100 200)
 
 export READ_LENGTH=150
