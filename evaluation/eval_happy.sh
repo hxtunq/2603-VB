@@ -104,7 +104,7 @@ function make_comparison()
 mkdir -p "${EVAL_DIR}"
 
 # WGS evaluation — all coverages
-for COV in "${COVERAGES_ALL[@]}"; do
+for COV in "${COVERAGES_WGS[@]}"; do
     VARIANT_DIR_COV="${RESULTS_DIR}/variants/${COV}x"
 
     for caller in ${WGS_CALLERS}; do
@@ -147,7 +147,7 @@ FIRST=true
 
 for REPORT in $(find "${EVAL_DIR}" -name "report.extended.csv" 2>/dev/null); do
     # Extract coverage and mode from path
-    COV=$(echo "${REPORT}" | grep -oP '\d+x' | head -1)
+    COV=$(echo "${REPORT}" | grep -oP '\d+x(?:_wes)?' | head -1)
     MODE=$(echo "${REPORT}" | grep -oP '(WGS|WES)' | head -1)
     CALLER=$(basename $(dirname "${REPORT}") | sed 's/_eval_data//')
 

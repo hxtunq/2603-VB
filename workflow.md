@@ -485,11 +485,11 @@ Chạy tất cả caller cho mỗi mức coverage:
 for COV in 10 20 30 50; do
   echo "=== Variant Calling: ${COV}x WGS ==="
 
-  bash pipelines/03_call_hc.sh ${COV}              # GATK HC (3 filters)
-  bash pipelines/04_call_dv.sh ${COV}               # DeepVariant
-  bash pipelines/05_call_strelka.sh ${COV}           # Strelka2 (with Manta)
-  bash pipelines/06_call_freebayes.sh ${COV}         # FreeBayes
-  bash pipelines/07_call_dnascope.sh ${COV}          # DNAscope (optional)
+  bash pipelines/03_call_hc.sh ${COV} > "logs/${COV}x/gatk.log" 2>&1              # GATK HC (3 filters)
+  bash pipelines/04_call_dv.sh ${COV} > "logs/${COV}x/deepvariant.log" 2>&1               # DeepVariant
+  bash pipelines/05_call_strelka.sh ${COV} > "logs/${COV}x/strelka2.log" 2>&1           # Strelka2 (with Manta)
+  bash pipelines/06_call_freebayes.sh ${COV} > "logs/${COV}x/freebayes.log" 2>&1         # FreeBayes
+  bash pipelines/07_call_dnascope.sh ${COV} > "logs/${COV}x/dnascope.log" 2>&1          # DNAscope (optional)
 done
 ```
 
@@ -501,11 +501,11 @@ done
 for COV in 50 100 200; do
   echo "=== Variant Calling: ${COV}x WES ==="
 
-  bash pipelines/03_call_hc_wes.sh ${COV}          # GATK HC WES
-  bash pipelines/04_call_dv_wes.sh ${COV}           # DeepVariant WES
-  bash pipelines/05_call_strelka_wes.sh ${COV}      # Strelka2 WES (with Manta --exome)
-  bash pipelines/06_call_freebayes_wes.sh ${COV}    # FreeBayes WES
-  bash pipelines/07_call_dnascope_wes.sh ${COV}     # DNAscope WES (optional)
+  bash pipelines/03_call_hc_wes.sh ${COV} > "logs/${COV}x_wes/gatk_wes.log" 2>&1          # GATK HC WES
+  bash pipelines/04_call_dv_wes.sh ${COV} > "logs/${COV}x_wes/deepvariant_wes.log" 2>&1           # DeepVariant WES
+  bash pipelines/05_call_strelka_wes.sh ${COV} > "logs/${COV}x_wes/strelka2_wes.log" 2>&1      # Strelka2 WES (with Manta --exome)
+  bash pipelines/06_call_freebayes_wes.sh ${COV} > "logs/${COV}x_wes/freebayes_wes.log" 2>&1    # FreeBayes WES
+  bash pipelines/07_call_dnascope_wes.sh ${COV} > "logs/${COV}x_wes/dnascope_wes.log" 2>&1     # DNAscope WES (optional)
 done
 ```
 

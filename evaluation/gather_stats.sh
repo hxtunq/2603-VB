@@ -24,9 +24,9 @@ head -n1 "${FIRST_REPORT}" | sed 's/^/Coverage\tMode\tCaller\t/' | tr ',' '\t' >
 # Data rows — walk all report files recursively
 find "${EVAL_DIR}" -name "report.extended.csv" | sort | while IFS= read -r REPORT; do
     # Extract coverage, mode, caller from path
-    # Expected path: ${EVAL_DIR}/{COV}x/{WGS|WES}/{caller}_eval_data/report.extended.csv
+    # Expected path: ${EVAL_DIR}/{COV}x({_wes})/{WGS|WES}/{caller}_eval_data/report.extended.csv
     REL_PATH="${REPORT#${EVAL_DIR}/}"
-    COV=$(echo "${REL_PATH}" | cut -d'/' -f1)         # e.g. 10x
+    COV=$(echo "${REL_PATH}" | cut -d'/' -f1)         # e.g. 10x or 50x_wes
     MODE=$(echo "${REL_PATH}" | cut -d'/' -f2)         # e.g. WGS or WES
     CALLER=$(echo "${REL_PATH}" | cut -d'/' -f3 | sed 's/_eval_data//')  # e.g. gatk
 
