@@ -62,7 +62,8 @@ export KNOWN_SNPS="${REF_DIR}/1000G_phase1.snps.high_confidence.hg38.chr22.vcf.g
 # SIMULATION PARAMETERS (simuG + ART)
 #-------------------------------------------------------------------------------
 # simuG — realistic for chr22 (~50 Mb, ~20K true variants)
-# NOTE: -titv_ratio removed intentionally to avoid biasing benchmark
+# NOTE: In simuG random SNP mode (-snp_count), set -titv_ratio explicitly in
+# the calling command; omitting it falls back to the tool default of 0.5.
 export SNP_COUNT=18000          # ~18K SNPs (realistic for chr22)
 export INDEL_COUNT=2500         # ~2.5K indels (SNP:INDEL ~ 7:1)
 export INDEL_MIN_LEN=1          # Minimum indel length

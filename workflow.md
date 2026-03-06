@@ -167,6 +167,7 @@ perl simuG/simuG.pl \
   -refseq reference/chr22.fa \
   -snp_count 18000 \
   -indel_count 2500 \
+  -titv_ratio 2.0 \
   -prefix simulated/SIMULATED_SAMPLE_chr22
 
 samtools faidx reference/chr22.fa
