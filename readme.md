@@ -1,35 +1,35 @@
 # Variant Calling Benchmark
 
-Benchmark variant callers on simulated `chr22` Illumina data with two explicit tracks:
+Benchmark variant callers on simulated `chr22` Illumina data with one primary comparison track and one optional Sentieon end-to-end path:
 
-- Track A: fair head-to-head comparison on the same shared dedup BAM
-- Track B: supplementary Sentieon pangenome end-to-end pipeline, reported separately
+- Primary benchmark: fair head-to-head comparison on the same shared dedup BAM
+- Optional DNAscope FASTQ runs: end-to-end Sentieon alignment + calling kept separate from the fair comparison
 
-The repository keeps WGS and WES as separate study modes and does not merge pangenome results into the main ranking.
+The repository keeps WGS and WES as separate study modes.
 
 ## Current Scope
 
 Implemented benchmark components:
 
 - Shared preprocessing: alignment, sorting, duplicate marking, coverage stats
-- Track A callers:
+- Shared-BAM callers:
   - GATK HaplotypeCaller
   - DeepVariant
   - Strelka2 + Manta
   - FreeBayes
   - Sentieon DNAscope
-- Track B callers:
-  - Sentieon DNAscope Pangenome WGS
-  - Sentieon DNAscope Pangenome WES
+- Optional end-to-end DNAscope from raw FASTQ:
+  - WGS
+  - WES
 - Truth-based evaluation with hap.py + RTG vcfeval
-- Summary plots from `results/eval/all_stats.tsv` and `results/eval_track_b/all_stats.tsv`
+- Summary plots from `results/eval/all_stats.tsv`
 
 Not implemented in this repo:
 
 - SnpEff / dbNSFP / ClinVar annotation pipeline
 - AlphaGenome functional-risk scoring
 
-Those items are now future work only, not runnable workflow steps.
+Those items are future work only, not runnable workflow steps.
 
 ## Study Design
 
@@ -40,8 +40,8 @@ Main coverage grid:
 
 Design rules:
 
-- Track A is the primary benchmark result because every caller sees the same dedup BAM.
-- Track B is supplementary because pangenome alignment changes the input BAM and cannot be interpreted as a fair caller-only comparison.
+- The shared-BAM track is the primary benchmark result because every caller sees the same dedup BAM.
+- The optional DNAscope FASTQ runs are supplementary because alignment is part of the pipeline and cannot be interpreted as a fair caller-only comparison.
 - The archived `-Impact-of-Sequencing-Depth-on-Variant-Detection--main` project is an HG002 chr22 exome downsampling study. Its findings are useful only as qualitative coverage guidance, not as WGS-vs-WES evidence.
 
 ## Repository Layout
@@ -53,7 +53,6 @@ variant-calling-benchmark/
 ├── evaluation/
 │   ├── _happy_common.sh
 │   ├── eval_happy.sh
-│   ├── eval_happy_track_b.sh
 │   └── gather_stats.sh
 ├── pipelines/
 │   ├── _sentieon_common.sh
@@ -62,7 +61,7 @@ variant-calling-benchmark/
 │   ├── 05_call_strelka*.sh
 │   ├── 06_call_freebayes*.sh
 │   ├── 07_call_dnascope*.sh
-│   └── 07_call_dnascope_pangenome*.sh
+│   └── 07_call_dnascope_fastq*.sh
 ├── visualization/
 │   ├── benchmark_plots.R
 │   └── plot_summary.py
@@ -83,7 +82,7 @@ rtg format -o "${RTG_SDF}" "${REF_FASTA}"
 # Prepare references, truth set, simulated FASTQs, and shared preprocessing
 # See workflow.md for the full commands
 
-# Track A: fair comparison on shared BAMs
+# Shared-BAM benchmark
 for COV in 10 20 30 50; do
   bash pipelines/03_call_hc.sh "${COV}"
   bash pipelines/04_call_dv.sh "${COV}"
@@ -100,18 +99,17 @@ for COV in 50 100 200; do
   bash pipelines/07_call_dnascope_wes.sh "${COV}"
 done
 
-# Track B: supplementary Sentieon pangenome runs
+# Optional: end-to-end DNAscope from raw FASTQs
 for COV in 10 20 30 50; do
-  bash pipelines/07_call_dnascope_pangenome.sh "${COV}"
+  bash pipelines/07_call_dnascope_fastq.sh "${COV}"
 done
 
 for COV in 50 100 200; do
-  bash pipelines/07_call_dnascope_pangenome_wes.sh "${COV}"
+  bash pipelines/07_call_dnascope_fastq_wes.sh "${COV}"
 done
 
 # Evaluation
 bash evaluation/eval_happy.sh
-bash evaluation/eval_happy_track_b.sh
 
 # Visualization
 Rscript visualization/benchmark_plots.R results/eval/all_stats.tsv results/plots
@@ -120,17 +118,11 @@ python visualization/plot_summary.py results/eval/all_stats.tsv results/plots
 
 ## Outputs
 
-Track A:
+Primary benchmark:
 
 - Variant calls: `results/variants/{coverage}/...` and `results/variants/{coverage}_wes/...`
 - Evaluation: `results/eval/...`
 - Aggregated stats: `results/eval/all_stats.tsv`
-
-Track B:
-
-- Variant calls: `results/variants/{coverage}/dnascope_pangenome/...` and `results/variants/{coverage}_wes/dnascope_pangenome_wes/...`
-- Evaluation: `results/eval_track_b/...`
-- Aggregated stats: `results/eval_track_b/all_stats.tsv`
 
 Benchmark runtime / CPU / RSS are appended per coverage to:
 
@@ -139,22 +131,20 @@ Benchmark runtime / CPU / RSS are appended per coverage to:
 
 ## Sentieon Notes
 
-The repo is standardized on Docker for Sentieon execution.
+Shared-BAM DNAscope and raw-FASTQ DNAscope use the local `sentieon-cli` stack. Keep `sentieon-cli`, `sentieon`, `samtools`, and `multiqc` in `PATH`.
 
 Required inputs for DNAscope:
 
 - `SENTIEON_LICENSE`
 - `DNASCOPE_WGS_MODEL`
 - `DNASCOPE_WES_MODEL`
-- `PANGENOME_INDEX` for Track B
 
-Track A DNAscope uses the shared dedup BAM directly. This is the fair-comparison path and matches official Sentieon support for variant calling from sorted BAM/CRAM.
+The shared-BAM DNAscope scripts use the shared dedup BAM directly. This is the fair-comparison path and matches official Sentieon support for variant calling from sorted BAM/CRAM.
 
-Track B DNAscope Pangenome starts from the simulated FASTQs and uses `bwa-mem2-pangenome`, so its result must stay separate from the main benchmark tables.
+The optional `07_call_dnascope_fastq*.sh` scripts run the full DNAscope alignment + calling pipeline from raw FASTQ for WGS and WES. Treat those as separate end-to-end experiments, not as shared-BAM fair-comparison runs.
 
 ## References
 
-- Sentieon pangenome usage: https://support.sentieon.com/versions/202503.02/docs/Pangenome_usage/pangenome/
 - Sentieon CLI docs: https://support.sentieon.com/docs/sentieon_cli/
 - Sentieon models: https://github.com/Sentieon/sentieon-models
 - Archived depth study: `archive/-Impact-of-Sequencing-Depth-on-Variant-Detection--main/`

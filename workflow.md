@@ -13,7 +13,6 @@ mkdir -p data/simulated
 mkdir -p results/preprocessing
 mkdir -p results/variants
 mkdir -p results/eval
-mkdir -p results/eval_track_b
 mkdir -p results/plots
 mkdir -p logs
 
@@ -82,6 +81,8 @@ wget -O umap_k100_mappability.bed.gz.tbi \
 tabix umap_k100_mappability.bed.gz chr22 | bgzip > umap_k100_mappability.chr22.bed.gz
 tabix -p bed umap_k100_mappability.chr22.bed.gz
 
+# phải dùng đến env biopython: conda activate biopython
+
 python3 - <<'PY'
 from Bio import SeqIO
 import re
@@ -92,6 +93,8 @@ with open("chr22_highconf_tmp.bed", "w") as out:
             if match.end() - match.start() >= 1000:
                 out.write(f"{record.id}\t{match.start()}\t{match.end()}\n")
 PY
+
+# quay về env ban đầu
 
 bedtools subtract -a chr22_highconf_tmp.bed -b umap_k100_mappability.chr22.bed.gz > chr22_highconf.bed
 rm chr22_highconf_tmp.bed
@@ -109,21 +112,47 @@ rtg format -o chr22.sdf chr22.fa
 
 ### 2.4 Sentieon Assets
 
-Track A DNAscope and Track B pangenome both require a valid license and model bundles.
+Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid license. The `07_call_dnascope*.sh` and `07_call_dnascope_fastq*.sh` scripts use the local `sentieon-cli` stack, so make sure `sentieon-cli`, `sentieon`, `samtools`, and `multiqc` are available in `PATH`. This repo expects DNAscope model bundles that provide `dnascope.model`, and the FASTQ workflows also need `bwa.model`.
 
 ```bash
-export SENTIEON_LICENSE=your_server:port
+export SENTIEON_LICENSE=/absolute/path/to/sentieon.lic
+# Or: export SENTIEON_LICENSE=license-server-host:port
 
-# Download and unpack the official model bundles into data/reference/models/
-# - DNAscopeIlluminaWGS2.0.bundle
-# - DNAscopeIlluminaWES2.0.bundle
+mkdir -p data/reference/models
 
-# Build the pangenome index prefix used by the supplementary Track B scripts.
-# The population VCF must match the reference build and contig naming.
-sentieon bwa-mem2-pangenome index data/reference/chr22.fa population_variants.vcf.gz
+# Sentieon model bundles are published here:
+#   https://github.com/Sentieon/sentieon-models
+#
+# Example Illumina bundle names listed there on 2026-03-06:
+#   - WGS: SentieonIlluminaWGS2.2.bundle
+#   - WES: DNAscopeIlluminaWES2.1.bundle
+#
+# The scripts in this repo use unpacked bundle directories, so extract the .bundle
+# archives with `ar x` and point DNASCOPE_WGS_MODEL / DNASCOPE_WES_MODEL at the
+# extracted directories.
+wget -O data/reference/models/SentieonIlluminaWGS2.2.bundle \
+  https://s3.amazonaws.com/sentieon-release/other/SentieonIlluminaWGS2.2.bundle
+wget -O data/reference/models/DNAscopeIlluminaWES2.1.bundle \
+  https://s3.amazonaws.com/sentieon-release/other/DNAscopeIlluminaWES2.1.bundle
+
+mkdir -p data/reference/models/SentieonIlluminaWGS2.2
+(
+  cd data/reference/models/SentieonIlluminaWGS2.2
+  ar x ../SentieonIlluminaWGS2.2.bundle
+)
+
+mkdir -p data/reference/models/DNAscopeIlluminaWES2.1
+(
+  cd data/reference/models/DNAscopeIlluminaWES2.1
+  ar x ../DNAscopeIlluminaWES2.1.bundle
+)
+
+export DNASCOPE_WGS_MODEL="$PWD/data/reference/models/SentieonIlluminaWGS2.2"
+export DNASCOPE_WES_MODEL="$PWD/data/reference/models/DNAscopeIlluminaWES2.1"
+
+# If you already have the older 2.0 bundles used in config/config.sh defaults,
+# unpack those instead and skip the overrides above.
 ```
-
-The resulting pangenome prefix should match `PANGENOME_INDEX` in `config/config.sh`.
 
 ## 3. Truth Set And Simulated FASTQs
 
@@ -325,19 +354,21 @@ for COV in 50 100 200; do
 done
 ```
 
-### 5.2 Track B: Supplementary DNAscope Pangenome
+### 5.2 Optional: DNAscope From Raw FASTQ
+
+Optional end-to-end DNAscope from the simulated raw FASTQs:
 
 ```bash
 for COV in 10 20 30 50; do
-  bash pipelines/07_call_dnascope_pangenome.sh "${COV}"
+  bash pipelines/07_call_dnascope_fastq.sh "${COV}"
 done
 
 for COV in 50 100 200; do
-  bash pipelines/07_call_dnascope_pangenome_wes.sh "${COV}"
+  bash pipelines/07_call_dnascope_fastq_wes.sh "${COV}"
 done
 ```
 
-Track B must not be pooled into the main caller ranking because it uses its own alignment pipeline from FASTQ.
+These runs use their own alignment pipeline from FASTQ, so keep them separate from the main Track A ranking.
 
 ## 6. Evaluation
 
@@ -352,22 +383,10 @@ Outputs:
 - Evaluation tree: `results/eval/...`
 - Aggregated stats: `results/eval/all_stats.tsv`
 
-### 6.2 Supplementary Track
-
-```bash
-bash evaluation/eval_happy_track_b.sh
-```
-
-Outputs:
-
-- Evaluation tree: `results/eval_track_b/...`
-- Aggregated stats: `results/eval_track_b/all_stats.tsv`
-
 `evaluation/gather_stats.sh` is the single collector and can also be called manually:
 
 ```bash
 bash evaluation/gather_stats.sh results/eval results/eval/all_stats.tsv
-bash evaluation/gather_stats.sh results/eval_track_b results/eval_track_b/all_stats.tsv
 ```
 
 ## 7. Visualization
@@ -382,7 +401,7 @@ Both plotting scripts now create separate output sets per `Mode + Coverage` comb
 ## 8. Method Notes
 
 - Track A is the paper-grade benchmark because all callers receive the same dedup BAM.
-- Track B is useful to show Sentieon’s end-to-end pangenome best case, but it is not a fair caller-only comparison.
+- The optional DNAscope FASTQ runs are useful to show Sentieon's end-to-end behavior, but they are not a fair caller-only comparison.
 - The archived HG002 depth study in `archive/-Impact-of-Sequencing-Depth-on-Variant-Detection--main/` is exome-only chr22 downsampling. It supports qualitative depth intuition only:
   - `<=10x` is unstable
   - `~40x` is workable for general research use

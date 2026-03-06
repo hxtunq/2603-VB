@@ -20,12 +20,12 @@ get_vcf() {
         deepvariant)     printf '%s\n' "${variant_dir}/deepvariant/${PREFIX}_DV_STANDART.vcf" ;;
         strelka2)        printf '%s\n' "${variant_dir}/strelka2/${PREFIX}_STRELKA_STANDART.vcf.gz" ;;
         freebayes)       printf '%s\n' "${variant_dir}/freebayes/${PREFIX}_FB_STANDART.vcf" ;;
-        dnascope)        printf '%s\n' "${variant_dir}/dnascope/${PREFIX}_DNASCOPE.vcf" ;;
+        dnascope)        printf '%s\n' "${variant_dir}/dnascope/${PREFIX}_DNASCOPE.vcf.gz" ;;
         gatk_wes)        printf '%s\n' "${variant_dir}/gatk_wes/${PREFIX}_HC_HARDFILTER.vcf" ;;
         deepvariant_wes) printf '%s\n' "${variant_dir}/deepvariant_wes/${PREFIX}_DV_STANDART.vcf" ;;
         strelka2_wes)    printf '%s\n' "${variant_dir}/strelka2_wes/${PREFIX}_STRELKA_STANDART.vcf.gz" ;;
         freebayes_wes)   printf '%s\n' "${variant_dir}/freebayes_wes/${PREFIX}_FB_STANDART.vcf" ;;
-        dnascope_wes)    printf '%s\n' "${variant_dir}/dnascope_wes/${PREFIX}_DNASCOPE.vcf" ;;
+        dnascope_wes)    printf '%s\n' "${variant_dir}/dnascope_wes/${PREFIX}_DNASCOPE.vcf.gz" ;;
         *)               return 1 ;;
     esac
 }

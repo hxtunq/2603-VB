@@ -23,19 +23,17 @@ caller_alias <- function(x) {
   if (grepl("^freebayes", x)) return("FB")
   if (grepl("^gatk", x)) return("HC")
   if (grepl("^strelka2", x)) return("ST")
-  if (grepl("^dnascope_pangenome", x)) return("DSPG")
   if (grepl("^dnascope", x)) return("DS")
   x
 }
 
-caller_levels <- c("HC", "DV", "ST", "FB", "DS", "DSPG")
+caller_levels <- c("HC", "DV", "ST", "FB", "DS")
 caller_colors <- c(
   "HC" = "#4CAF50",
   "DV" = "#2196F3",
   "ST" = "#E91E63",
   "FB" = "#FF9800",
-  "DS" = "#009688",
-  "DSPG" = "#6D4C41"
+  "DS" = "#009688"
 )
 
 bdata$CallerFilter <- vapply(bdata$Caller, caller_alias, character(1))

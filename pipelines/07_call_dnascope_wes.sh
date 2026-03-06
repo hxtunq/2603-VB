@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sentieon DNAscope — WES mode on the shared dedup BAM.
+# Sentieon DNAscope - WES mode on the shared dedup BAM via sentieon-cli.
 
 set -euo pipefail
 
@@ -15,64 +15,45 @@ source "${BAM_PATH_FILE}"
 
 CALLER="dnascope_wes"
 TIMEFILE="${LOG_DIR}/${COV}x_wes/time/dnascope_wes.time"
+OUTPUT_VCF=""
+CMD=()
 
 sentieon_skip_if_no_license "DNAscope WES"
-sentieon_require_command docker
+sentieon_require_dnascope_cli_stack
 sentieon_require_file "${FINAL_BAM}"
-sentieon_require_file "${REF_FASTA}"
+sentieon_require_reference_fasta "${REF_FASTA}"
 sentieon_require_file "${DBSNP}"
+sentieon_require_vcf_index "${DBSNP}"
 sentieon_require_file "${EXOME_BED}"
-sentieon_require_file "${DNASCOPE_WES_MODEL}/dnascope.model"
+sentieon_require_model_bundle "${DNASCOPE_WES_MODEL}"
 
 sentieon_prepare_layout "${COV}x_wes" "${CALLER}"
-sentieon_init_license_args
-sentieon_set_pcr_arg
 
-ABS_REF_DIR=$(sentieon_abs_dir "${REF_DIR}")
-ABS_PREPROC_DIR=$(sentieon_abs_dir "$(dirname "${FINAL_BAM}")")
-ABS_OUT_DIR=$(sentieon_abs_dir "${OUT_DIR}")
-ABS_MODEL_DIR=$(sentieon_abs_dir "${DNASCOPE_WES_MODEL}")
+OUTPUT_VCF="${OUT_DIR}/${PREFIX}_DNASCOPE.vcf.gz"
 
-REF_BASENAME=$(basename "${REF_FASTA}")
-DBSNP_BASENAME=$(basename "${DBSNP}")
-BED_BASENAME=$(basename "${EXOME_BED}")
-BAM_BASENAME=$(basename "${FINAL_BAM}")
+CMD=(
+    sentieon-cli dnascope
+    -r "${REF_FASTA}"
+    -i "${FINAL_BAM}"
+    -m "${DNASCOPE_WES_MODEL}"
+    -d "${DBSNP}"
+    -b "${EXOME_BED}"
+    -t "${THREADS}"
+    --duplicate_marking none
+    --assay WES
+    "${OUTPUT_VCF}"
+)
+
+if [[ "${PCRFREE:-false}" == "true" ]]; then
+    CMD+=(--pcr_free)
+fi
 
 echo "=== Running Sentieon DNAscope (WES, shared BAM) ==="
 
-/usr/bin/time -v -o "${TIMEFILE}" \
-    docker run --rm \
-    "${SENTIEON_DOCKER_LICENSE_ARGS[@]}" \
-    -v "${ABS_REF_DIR}:/ref:ro" \
-    -v "${ABS_PREPROC_DIR}:/input:ro" \
-    -v "${ABS_OUT_DIR}:/output" \
-    -v "${ABS_MODEL_DIR}:/model:ro" \
-    "${SENTIEON_IMAGE}" \
-    bash -lc "
-        set -euo pipefail
-        sentieon driver \
-            -r /ref/${REF_BASENAME} \
-            -t ${THREADS} \
-            -i /input/${BAM_BASENAME} \
-            --interval /ref/${BED_BASENAME} \
-            --algo DNAscope ${SENTIEON_PCR_ARG} \
-            --model /model/dnascope.model \
-            -d /ref/${DBSNP_BASENAME} \
-            /output/${PREFIX}_DNASCOPE_TMP.vcf
-
-        sentieon driver \
-            -r /ref/${REF_BASENAME} \
-            -t ${THREADS} \
-            --algo DNAModelApply \
-            --model /model/dnascope.model \
-            -v /output/${PREFIX}_DNASCOPE_TMP.vcf \
-            /output/${PREFIX}_DNASCOPE.vcf
-    "
+/usr/bin/time -v -o "${TIMEFILE}" "${CMD[@]}"
 
 sentieon_log_metrics "dnascope_wes" "DNAscope_WES" "${TIMEFILE}"
 
-rm -f "${OUT_DIR}/${PREFIX}_DNASCOPE_TMP.vcf" "${OUT_DIR}/${PREFIX}_DNASCOPE_TMP.vcf.idx"
-
 echo
-echo "DNAscope WES done: ${OUT_DIR}/${PREFIX}_DNASCOPE.vcf"
+echo "DNAscope WES done: ${OUTPUT_VCF}"
 echo "Metrics: ${METRICS}"

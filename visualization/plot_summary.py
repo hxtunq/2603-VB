@@ -23,7 +23,6 @@ COLORS = {
     "ST": "#E91E63",
     "FB": "#FF9800",
     "DS": "#009688",
-    "DSPG": "#6D4C41",
 }
 
 
@@ -36,8 +35,6 @@ def alias_caller(name: str) -> str:
         return "HC"
     if name.startswith("strelka2"):
         return "ST"
-    if name.startswith("dnascope_pangenome"):
-        return "DSPG"
     if name.startswith("dnascope"):
         return "DS"
     return name
@@ -48,7 +45,7 @@ def sanitize(mode: str, coverage: str) -> str:
 
 
 def ordered_subset(df: pd.DataFrame) -> pd.DataFrame:
-    order = {"HC": 0, "DV": 1, "ST": 2, "FB": 3, "DS": 4, "DSPG": 5}
+    order = {"HC": 0, "DV": 1, "ST": 2, "FB": 3, "DS": 4}
     return df.assign(_order=df["CallerAlias"].map(order).fillna(99)).sort_values("_order")
 
 

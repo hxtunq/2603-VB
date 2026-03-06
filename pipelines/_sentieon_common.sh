@@ -23,6 +23,21 @@ sentieon_require_file() {
     [[ -f "${path}" ]] || sentieon_die "Required file not found: ${path}"
 }
 
+sentieon_require_vcf_index() {
+    local path="$1"
+
+    case "${path}" in
+        *.vcf.gz)
+            [[ -f "${path}.tbi" || -f "${path}.csi" ]] || \
+                sentieon_die "Required VCF index not found for: ${path}"
+            ;;
+        *.vcf)
+            [[ -f "${path}.idx" || -f "${path}.tbi" || -f "${path}.csi" ]] || \
+                sentieon_die "Required VCF index not found for: ${path}"
+            ;;
+    esac
+}
+
 sentieon_require_dir() {
     local path="$1"
     [[ -d "${path}" ]] || sentieon_die "Required directory not found: ${path}"
@@ -36,6 +51,44 @@ sentieon_require_prefix() {
 sentieon_abs_dir() {
     local path="$1"
     (cd "${path}" >/dev/null 2>&1 && pwd)
+}
+
+sentieon_require_reference_fasta() {
+    local fasta="$1"
+
+    sentieon_require_file "${fasta}"
+    sentieon_require_file "${fasta}.fai"
+}
+
+sentieon_require_bwa_index() {
+    local fasta="$1"
+
+    for ext in amb ann bwt pac sa; do
+        sentieon_require_file "${fasta}.${ext}"
+    done
+}
+
+sentieon_require_model_bundle() {
+    local bundle="$1"
+    local need_bwa="${2:-false}"
+
+    if [[ -d "${bundle}" ]]; then
+        sentieon_require_file "${bundle}/dnascope.model"
+
+        if [[ "${need_bwa}" == "true" ]]; then
+            sentieon_require_file "${bundle}/bwa.model"
+        fi
+        return
+    fi
+
+    sentieon_require_file "${bundle}"
+}
+
+sentieon_require_dnascope_cli_stack() {
+    sentieon_require_command sentieon-cli
+    sentieon_require_command sentieon
+    sentieon_require_command samtools
+    sentieon_require_command multiqc
 }
 
 sentieon_prepare_layout() {
@@ -106,4 +159,17 @@ sentieon_set_fastq_paths() {
         FASTQ_R2="${SIM_DIR}/${PREFIX}_${cov}x_R2.fastq.gz"
         COV_SUFFIX="${cov}x"
     fi
+}
+
+sentieon_build_readgroup() {
+    local cov="$1"
+    local mode="${2:-wgs}"
+    local rg_id="${SAMPLE_NAME}_${cov}x"
+
+    if [[ "${mode}" == "wes" ]]; then
+        rg_id="${SAMPLE_NAME}_${cov}x_wes"
+    fi
+
+    printf '@RG\tID:%s\tSM:%s\tPL:ILLUMINA\tLB:lib1\tPU:unit1' \
+        "${rg_id}" "${SAMPLE_NAME}"
 }
