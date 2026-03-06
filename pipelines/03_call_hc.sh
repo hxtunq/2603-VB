@@ -32,6 +32,8 @@ log_metrics() {
     echo "  [METRICS] ${pipeline}: ${wall} wall, ${cpu}% CPU, MaxRSS=${rss} kB"
 }
 
+FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_HC_${COV}x_WGS.vcf"
+
 # --- BQSR (not timed) ---
 echo "Running BaseRecalibrator..."
 gatk --java-options "${JAVA_OPTS}" BaseRecalibrator \
@@ -95,11 +97,11 @@ echo "=== Filter: Hard Filter ==="
     gatk MergeVcfs \
         -I '${OUT_DIR}/${PREFIX}.HC.snps.flt.vcf' \
         -I '${OUT_DIR}/${PREFIX}.HC.indels.flt.vcf' \
-        -O '${OUT_DIR}/${PREFIX}_HC_HARDFILTER.vcf'
+        -O '${FINAL_VCF}'
 "
 log_metrics "gatk" "Filter_HardFilter" "${TIMEDIR}/hc_filter_hard.time"
 
 echo ""
 echo "HC done. Metrics in ${METRICS}:"
 echo "  HaplotypeCaller    = calling step"
-echo "  Filter_HardFilter  → ${PREFIX}_HC_HARDFILTER.vcf"
+echo "  Filter_HardFilter  -> ${FINAL_VCF}"

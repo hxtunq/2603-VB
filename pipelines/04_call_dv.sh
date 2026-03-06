@@ -38,6 +38,7 @@ ABS_OUT_DIR=$(cd "${OUT_DIR}" && pwd)
 
 BAM_BASENAME=$(basename "${FINAL_BAM}")
 REF_BASENAME=$(basename "${REF_FASTA}")
+OUTPUT_PREFIX="SS_${CHR_TO_USE}_DV_${COV}x_WGS"
 
 echo "=== Running DeepVariant ${DEEPVARIANT_VERSION} ==="
 /usr/bin/time -v -o "${TIMEDIR}/deepvariant.time" \
@@ -50,12 +51,12 @@ echo "=== Running DeepVariant ${DEEPVARIANT_VERSION} ==="
     --model_type=WGS \
     --ref="/ref/${REF_BASENAME}" \
     --reads="/input/${BAM_BASENAME}" \
-    --output_vcf="/output/${PREFIX}_DV_STANDARD.vcf" \
-    --output_gvcf="/output/${PREFIX}_DV.g.vcf" \
+    --output_vcf="/output/${OUTPUT_PREFIX}.vcf" \
+    --output_gvcf="/output/${OUTPUT_PREFIX}.g.vcf" \
     --num_shards=${THREADS}
 
 log_metrics "deepvariant" "DeepVariant" "${TIMEDIR}/deepvariant.time"
 
 echo ""
-echo "DV done: ${OUT_DIR}/${PREFIX}_DV_STANDARD.vcf"
+echo "DV done: ${OUT_DIR}/${OUTPUT_PREFIX}.vcf"
 echo "Metrics: ${METRICS}"

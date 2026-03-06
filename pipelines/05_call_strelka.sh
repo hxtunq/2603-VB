@@ -39,6 +39,7 @@ ABS_OUT_DIR=$(cd "${OUT_DIR}" && pwd)
 
 BAM_BASENAME=$(basename "${FINAL_BAM}")
 REF_BASENAME=$(basename "${REF_FASTA}")
+FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_STRELKA_${COV}x_WGS.vcf.gz"
 
 # ==========================================================================
 # Step 1: Manta — generate candidate indel sites
@@ -113,10 +114,10 @@ log_metrics "strelka2" "Strelka2" "${TIMEDIR}/strelka2.time"
 
 # --- Copy output ---
 cp "${OUT_DIR}/strelkawd/results/variants/variants.vcf.gz" \
-   "${OUT_DIR}/${PREFIX}_STRELKA_STANDARD.vcf.gz"
+   "${FINAL_VCF}"
 
 echo ""
 echo "Strelka2 done (with Manta candidate indels):"
 echo "  Manta candidates: ${CANDIDATE_INDELS}"
-echo "  Strelka output:   ${OUT_DIR}/${PREFIX}_STRELKA_STANDARD.vcf.gz"
+echo "  Strelka output:   ${FINAL_VCF}"
 echo "Metrics: ${METRICS}"

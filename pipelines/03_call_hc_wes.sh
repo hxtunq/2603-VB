@@ -32,6 +32,8 @@ log_metrics() {
     echo "  [METRICS] ${pipeline}: ${wall} wall, ${cpu}% CPU, MaxRSS=${rss} kB"
 }
 
+FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_HC_${COV}x_WES.vcf"
+
 # Validate exome BED
 if [[ ! -f "${EXOME_BED}" ]]; then
     echo "ERROR: EXOME_BED not found: ${EXOME_BED}"
@@ -103,11 +105,11 @@ echo "=== Filter: Hard Filter (WES) ==="
     gatk MergeVcfs \
         -I '${OUT_DIR}/${PREFIX}.HC.snps.flt.vcf' \
         -I '${OUT_DIR}/${PREFIX}.HC.indels.flt.vcf' \
-        -O '${OUT_DIR}/${PREFIX}_HC_HARDFILTER.vcf'
+        -O '${FINAL_VCF}'
 "
 log_metrics "gatk_wes" "Filter_HardFilter_WES" "${TIMEDIR}/hc_wes_filter_hard.time"
 
 echo ""
 echo "HC WES done. Metrics in ${METRICS}:"
 echo "  HaplotypeCaller_WES   = calling with -L ${EXOME_BED}"
-echo "  Filter_HardFilter_WES → ${PREFIX}_HC_HARDFILTER.vcf"
+echo "  Filter_HardFilter_WES -> ${FINAL_VCF}"

@@ -14,18 +14,20 @@ WES_CALLERS="gatk_wes deepvariant_wes strelka2_wes freebayes_wes dnascope_wes"
 get_vcf() {
     local caller="$1"
     local variant_dir="$2"
+    local cov="$3"
+    local mode="$4"
 
     case "${caller}" in
-        gatk)            printf '%s\n' "${variant_dir}/gatk/${PREFIX}_HC_HARDFILTER.vcf" ;;
-        deepvariant)     printf '%s\n' "${variant_dir}/deepvariant/${PREFIX}_DV_STANDARD.vcf" ;;
-        strelka2)        printf '%s\n' "${variant_dir}/strelka2/${PREFIX}_STRELKA_STANDARD.vcf.gz" ;;
-        freebayes)       printf '%s\n' "${variant_dir}/freebayes/${PREFIX}_FB_STANDARD.vcf" ;;
-        dnascope)        printf '%s\n' "${variant_dir}/dnascope/${PREFIX}_DNASCOPE.vcf.gz" ;;
-        gatk_wes)        printf '%s\n' "${variant_dir}/gatk_wes/${PREFIX}_HC_HARDFILTER.vcf" ;;
-        deepvariant_wes) printf '%s\n' "${variant_dir}/deepvariant_wes/${PREFIX}_DV_STANDARD.vcf" ;;
-        strelka2_wes)    printf '%s\n' "${variant_dir}/strelka2_wes/${PREFIX}_STRELKA_STANDARD.vcf.gz" ;;
-        freebayes_wes)   printf '%s\n' "${variant_dir}/freebayes_wes/${PREFIX}_FB_STANDARD.vcf" ;;
-        dnascope_wes)    printf '%s\n' "${variant_dir}/dnascope_wes/${PREFIX}_DNASCOPE.vcf.gz" ;;
+        gatk)            printf '%s\n' "${variant_dir}/gatk/SS_${CHR_TO_USE}_HC_${cov}x_${mode}.vcf" ;;
+        deepvariant)     printf '%s\n' "${variant_dir}/deepvariant/SS_${CHR_TO_USE}_DV_${cov}x_${mode}.vcf" ;;
+        strelka2)        printf '%s\n' "${variant_dir}/strelka2/SS_${CHR_TO_USE}_STRELKA_${cov}x_${mode}.vcf.gz" ;;
+        freebayes)       printf '%s\n' "${variant_dir}/freebayes/SS_${CHR_TO_USE}_FB_${cov}x_${mode}.vcf" ;;
+        dnascope)        printf '%s\n' "${variant_dir}/dnascope/SS_${CHR_TO_USE}_DNASCOPE_${cov}x_${mode}.vcf.gz" ;;
+        gatk_wes)        printf '%s\n' "${variant_dir}/gatk_wes/SS_${CHR_TO_USE}_HC_${cov}x_${mode}.vcf" ;;
+        deepvariant_wes) printf '%s\n' "${variant_dir}/deepvariant_wes/SS_${CHR_TO_USE}_DV_${cov}x_${mode}.vcf" ;;
+        strelka2_wes)    printf '%s\n' "${variant_dir}/strelka2_wes/SS_${CHR_TO_USE}_STRELKA_${cov}x_${mode}.vcf.gz" ;;
+        freebayes_wes)   printf '%s\n' "${variant_dir}/freebayes_wes/SS_${CHR_TO_USE}_FB_${cov}x_${mode}.vcf" ;;
+        dnascope_wes)    printf '%s\n' "${variant_dir}/dnascope_wes/SS_${CHR_TO_USE}_DNASCOPE_${cov}x_${mode}.vcf.gz" ;;
         *)               return 1 ;;
     esac
 }
@@ -44,7 +46,7 @@ for COV in "${COVERAGES_WGS[@]}"; do
     VARIANT_DIR_COV="${VARIANT_DIR}/${COV}x"
 
     for caller in ${WGS_CALLERS}; do
-        VCF=$(get_vcf "${caller}" "${VARIANT_DIR_COV}")
+        VCF=$(get_vcf "${caller}" "${VARIANT_DIR_COV}" "${COV}" "WGS")
         if [[ -f "${VCF}" ]] || [[ -f "${VCF}.gz" ]]; then
             happy_make_comparison "${VCF}" "${caller}" "${COV}" "WGS" "${EVAL_DIR}"
         else
@@ -57,7 +59,7 @@ for COV in "${COVERAGES_WES[@]}"; do
     VARIANT_DIR_COV="${VARIANT_DIR}/${COV}x_wes"
 
     for caller in ${WES_CALLERS}; do
-        VCF=$(get_vcf "${caller}" "${VARIANT_DIR_COV}")
+        VCF=$(get_vcf "${caller}" "${VARIANT_DIR_COV}" "${COV}" "WES")
         if [[ -f "${VCF}" ]] || [[ -f "${VCF}.gz" ]]; then
             happy_make_comparison "${VCF}" "${caller}" "${COV}" "WES" "${EVAL_DIR}"
         else

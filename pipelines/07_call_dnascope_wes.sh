@@ -30,7 +30,7 @@ MODEL_BUNDLE=$(sentieon_resolve_model_bundle "${DNASCOPE_WES_MODEL}")
 
 sentieon_prepare_layout "${COV}x_wes" "${CALLER}"
 
-OUTPUT_VCF="${OUT_DIR}/${PREFIX}_DNASCOPE.vcf.gz"
+OUTPUT_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_DNASCOPE_${COV}x_WES.vcf.gz"
 
 CMD=(
     sentieon-cli dnascope

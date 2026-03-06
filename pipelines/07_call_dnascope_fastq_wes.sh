@@ -31,7 +31,7 @@ MODEL_BUNDLE=$(sentieon_resolve_model_bundle "${DNASCOPE_WES_MODEL}" "true")
 sentieon_prepare_layout "${COV_SUFFIX}" "${CALLER}"
 
 READGROUP=$(sentieon_build_readgroup "${COV}" "wes")
-OUTPUT_VCF="${OUT_DIR}/${PREFIX}_DNASCOPE_FASTQ.vcf.gz"
+OUTPUT_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_DNASCOPE_FASTQ_${COV}x_WES.vcf.gz"
 
 CMD=(
     sentieon-cli dnascope

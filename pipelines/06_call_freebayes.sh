@@ -32,6 +32,8 @@ log_metrics() {
     echo "  [METRICS] ${pipeline}: ${wall} wall, ${cpu}% CPU, MaxRSS=${rss} kB"
 }
 
+FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_FB_${COV}x_WGS.vcf"
+
 # --- FreeBayes (measured) ---
 echo "=== Running FreeBayes ==="
 /usr/bin/time -v -o "${TIMEDIR}/freebayes.time" \
@@ -61,8 +63,8 @@ gatk VariantFiltration \
     -filter "SAR < 1" --filter-name "SAR1" \
     -filter "QUAL < 30.0" --filter-name "QUAL30" \
     -filter "QUAL / AO < 10.0" --filter-name "QUALbyAO10" \
-    -O "${OUT_DIR}/${PREFIX}_FB_STANDARD.vcf"
+    -O "${FINAL_VCF}"
 
 echo ""
-echo "FB done: ${OUT_DIR}/${PREFIX}_FB_STANDARD.vcf"
+echo "FB done: ${FINAL_VCF}"
 echo "Metrics: ${METRICS}"

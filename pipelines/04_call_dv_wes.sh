@@ -45,6 +45,7 @@ ABS_OUT_DIR=$(cd "${OUT_DIR}" && pwd)
 BAM_BASENAME=$(basename "${FINAL_BAM}")
 REF_BASENAME=$(basename "${REF_FASTA}")
 BED_BASENAME=$(basename "${EXOME_BED}")
+OUTPUT_PREFIX="SS_${CHR_TO_USE}_DV_${COV}x_WES"
 
 echo "=== Running DeepVariant ${DEEPVARIANT_VERSION} (WES) ==="
 /usr/bin/time -v -o "${TIMEDIR}/deepvariant_wes.time" \
@@ -58,12 +59,12 @@ echo "=== Running DeepVariant ${DEEPVARIANT_VERSION} (WES) ==="
     --ref="/ref/${REF_BASENAME}" \
     --reads="/input/${BAM_BASENAME}" \
     --regions="/ref/${BED_BASENAME}" \
-    --output_vcf="/output/${PREFIX}_DV_STANDARD.vcf" \
-    --output_gvcf="/output/${PREFIX}_DV.g.vcf" \
+    --output_vcf="/output/${OUTPUT_PREFIX}.vcf" \
+    --output_gvcf="/output/${OUTPUT_PREFIX}.g.vcf" \
     --num_shards=${THREADS}
 
 log_metrics "deepvariant_wes" "DeepVariant_WES" "${TIMEDIR}/deepvariant_wes.time"
 
 echo ""
-echo "DV WES done: ${OUT_DIR}/${PREFIX}_DV_STANDARD.vcf"
+echo "DV WES done: ${OUT_DIR}/${OUTPUT_PREFIX}.vcf"
 echo "Metrics: ${METRICS}"

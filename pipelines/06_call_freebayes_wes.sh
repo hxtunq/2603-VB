@@ -32,6 +32,8 @@ log_metrics() {
     echo "  [METRICS] ${pipeline}: ${wall} wall, ${cpu}% CPU, MaxRSS=${rss} kB"
 }
 
+FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_FB_${COV}x_WES.vcf"
+
 # Validate exome BED
 if [[ ! -f "${EXOME_BED}" ]]; then
     echo "ERROR: EXOME_BED not found: ${EXOME_BED}"
@@ -68,8 +70,8 @@ gatk VariantFiltration \
     -filter "SAR < 1" --filter-name "SAR1" \
     -filter "QUAL < 30.0" --filter-name "QUAL30" \
     -filter "QUAL / AO < 10.0" --filter-name "QUALbyAO10" \
-    -O "${OUT_DIR}/${PREFIX}_FB_STANDARD.vcf"
+    -O "${FINAL_VCF}"
 
 echo ""
-echo "FB WES done: ${OUT_DIR}/${PREFIX}_FB_STANDARD.vcf"
+echo "FB WES done: ${FINAL_VCF}"
 echo "Metrics: ${METRICS}"

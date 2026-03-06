@@ -44,6 +44,7 @@ ABS_OUT_DIR=$(cd "${OUT_DIR}" && pwd)
 
 BAM_BASENAME=$(basename "${FINAL_BAM}")
 REF_BASENAME=$(basename "${REF_FASTA}")
+FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_STRELKA_${COV}x_WES.vcf.gz"
 
 # Strelka2/Manta require bgzipped+tabixed BED for --callRegions
 CALL_REGIONS_BED="${OUT_DIR}/exome_targets.bed.gz"
@@ -121,9 +122,9 @@ echo "=== Running Strelka2 (WES + exome mode) ==="
 log_metrics "strelka2_wes" "Strelka2_WES" "${TIMEDIR}/strelka2_wes.time"
 
 cp "${OUT_DIR}/strelkawd/results/variants/variants.vcf.gz" \
-   "${OUT_DIR}/${PREFIX}_STRELKA_STANDARD.vcf.gz"
+   "${FINAL_VCF}"
 
 echo ""
 echo "Strelka2 WES done (with Manta, exome mode):"
-echo "  Output: ${OUT_DIR}/${PREFIX}_STRELKA_STANDARD.vcf.gz"
+echo "  Output: ${FINAL_VCF}"
 echo "Metrics: ${METRICS}"
