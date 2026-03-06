@@ -113,7 +113,7 @@ rtg format -o chr22.sdf chr22.fa
 
 ### 2.4 Sentieon Assets
 
-Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid license. The `07_call_dnascope*.sh` and `07_call_dnascope_fastq*.sh` scripts use the local `sentieon-cli` stack, so make sure `sentieon-cli`, `sentieon`, `samtools`, and `multiqc` are available in `PATH`. This repo expects DNAscope model bundles that provide `dnascope.model`, and the FASTQ workflows also need `bwa.model`.
+Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid license. The `07_call_dnascope*.sh` and `07_call_dnascope_fastq*.sh` scripts invoke the local `sentieon-cli` command directly, so make sure `sentieon-cli` is available in `PATH`. This repo expects DNAscope model bundles that provide `dnascope.model`, and the FASTQ workflows also need `bwa.model`.
 
 ```bash
 # pwd: variant-calling-benchmark

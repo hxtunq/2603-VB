@@ -86,9 +86,6 @@ sentieon_require_model_bundle() {
 
 sentieon_require_dnascope_cli_stack() {
     sentieon_require_command sentieon-cli
-    sentieon_require_command sentieon
-    sentieon_require_command samtools
-    sentieon_require_command multiqc
 }
 
 sentieon_prepare_layout() {

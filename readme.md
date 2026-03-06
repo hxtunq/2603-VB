@@ -131,7 +131,7 @@ Benchmark runtime / CPU / RSS are appended per coverage to:
 
 ## Sentieon Notes
 
-Shared-BAM DNAscope and raw-FASTQ DNAscope use the local `sentieon-cli` stack. Keep `sentieon-cli`, `sentieon`, `samtools`, and `multiqc` in `PATH`.
+Shared-BAM DNAscope and raw-FASTQ DNAscope use the local `sentieon-cli` command. Keep `sentieon-cli` in `PATH`.
 
 Required inputs for DNAscope:
 
