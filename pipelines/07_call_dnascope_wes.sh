@@ -16,6 +16,7 @@ source "${BAM_PATH_FILE}"
 CALLER="dnascope_wes"
 TIMEFILE="${LOG_DIR}/${COV}x_wes/time/dnascope_wes.time"
 OUTPUT_VCF=""
+MODEL_BUNDLE=""
 CMD=()
 
 sentieon_skip_if_no_license "DNAscope WES"
@@ -25,7 +26,7 @@ sentieon_require_reference_fasta "${REF_FASTA}"
 sentieon_require_file "${DBSNP}"
 sentieon_require_vcf_index "${DBSNP}"
 sentieon_require_file "${EXOME_BED}"
-sentieon_require_model_bundle "${DNASCOPE_WES_MODEL}"
+MODEL_BUNDLE=$(sentieon_resolve_model_bundle "${DNASCOPE_WES_MODEL}")
 
 sentieon_prepare_layout "${COV}x_wes" "${CALLER}"
 
@@ -35,7 +36,7 @@ CMD=(
     sentieon-cli dnascope
     -r "${REF_FASTA}"
     -i "${FINAL_BAM}"
-    -m "${DNASCOPE_WES_MODEL}"
+    -m "${MODEL_BUNDLE}"
     -d "${DBSNP}"
     -b "${EXOME_BED}"
     -t "${THREADS}"

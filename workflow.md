@@ -113,7 +113,7 @@ rtg format -o chr22.sdf chr22.fa
 
 ### 2.4 Sentieon Assets
 
-Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid license. The `07_call_dnascope*.sh` and `07_call_dnascope_fastq*.sh` scripts invoke the local `sentieon-cli` command directly, so make sure `sentieon-cli` is available in `PATH`. This repo expects DNAscope model bundles that provide `dnascope.model`, and the FASTQ workflows also need `bwa.model`.
+Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid license. The `07_call_dnascope*.sh` and `07_call_dnascope_fastq*.sh` scripts invoke the local `sentieon-cli` command directly, so make sure `sentieon-cli` is available in `PATH`. For `sentieon-cli dnascope`, `DNASCOPE_WGS_MODEL` and `DNASCOPE_WES_MODEL` must point to the downloaded `.bundle` files, not unpacked directories.
 
 ```bash
 # pwd: variant-calling-benchmark
@@ -129,31 +129,17 @@ mkdir -p data/reference/models
 #   - WGS: SentieonIlluminaWGS2.2.bundle
 #   - WES: DNAscopeIlluminaWES2.1.bundle
 #
-# The scripts in this repo use unpacked bundle directories, so extract the .bundle
-# archives with `ar x` and point DNASCOPE_WGS_MODEL / DNASCOPE_WES_MODEL at the
-# extracted directories.
+# Point DNASCOPE_WGS_MODEL / DNASCOPE_WES_MODEL at these .bundle archives directly.
 wget -O data/reference/models/SentieonIlluminaWGS2.2.bundle \
   https://s3.amazonaws.com/sentieon-release/other/SentieonIlluminaWGS2.2.bundle
 wget -O data/reference/models/DNAscopeIlluminaWES2.1.bundle \
   https://s3.amazonaws.com/sentieon-release/other/DNAscopeIlluminaWES2.1.bundle
 
-mkdir -p data/reference/models/SentieonIlluminaWGS2.2
-(
-  cd data/reference/models/SentieonIlluminaWGS2.2
-  ar x ../SentieonIlluminaWGS2.2.bundle
-)
-
-mkdir -p data/reference/models/DNAscopeIlluminaWES2.1
-(
-  cd data/reference/models/DNAscopeIlluminaWES2.1
-  ar x ../DNAscopeIlluminaWES2.1.bundle
-)
-
-export DNASCOPE_WGS_MODEL="$PWD/data/reference/models/SentieonIlluminaWGS2.2"
-export DNASCOPE_WES_MODEL="$PWD/data/reference/models/DNAscopeIlluminaWES2.1"
+export DNASCOPE_WGS_MODEL="$PWD/data/reference/models/SentieonIlluminaWGS2.2.bundle"
+export DNASCOPE_WES_MODEL="$PWD/data/reference/models/DNAscopeIlluminaWES2.1.bundle"
 
 # If you already have the older 2.0 bundles used in config/config.sh defaults,
-# unpack those instead and skip the overrides above.
+# point the variables at those .bundle files instead and skip the overrides above.
 ```
 
 ## 3. Truth Set And Simulated FASTQs

@@ -136,8 +136,10 @@ Shared-BAM DNAscope and raw-FASTQ DNAscope use the local `sentieon-cli` command.
 Required inputs for DNAscope:
 
 - `SENTIEON_LICENSE`
-- `DNASCOPE_WGS_MODEL`
-- `DNASCOPE_WES_MODEL`
+- `DNASCOPE_WGS_MODEL` pointing to a `.bundle` file
+- `DNASCOPE_WES_MODEL` pointing to a `.bundle` file
+
+If you previously extracted the Sentieon model bundles and exported `DNASCOPE_*_MODEL` as those directories, update them to the original `.bundle` archive paths instead. The scripts now resolve a sibling `.bundle` automatically when possible, but the canonical configuration is the archive file.
 
 The shared-BAM DNAscope scripts use the shared dedup BAM directly. This is the fair-comparison path and matches official Sentieon support for variant calling from sorted BAM/CRAM.
 

@@ -135,8 +135,8 @@ export SENTIEON_VERSION="${SENTIEON_VERSION:-202503.02}"
 
 # === Sentieon DNAscope Model Bundles ===
 # Download from: https://github.com/Sentieon/sentieon-models
-# These paths must point to unpacked bundle directories that contain bwa.model
-# and dnascope.model. The defaults below assume the older 2.0 bundle names.
+# sentieon-cli dnascope expects -m/--model_bundle to be the .bundle archive file.
+# Do not point these variables at unpacked directories.
 # Override DNASCOPE_WGS_MODEL / DNASCOPE_WES_MODEL if you download newer bundles.
 # WGS: DNAscopeIlluminaWGS2.0.bundle
 # WES: DNAscopeIlluminaWES2.0.bundle

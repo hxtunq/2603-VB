@@ -38,21 +38,6 @@ sentieon_require_vcf_index() {
     esac
 }
 
-sentieon_require_dir() {
-    local path="$1"
-    [[ -d "${path}" ]] || sentieon_die "Required directory not found: ${path}"
-}
-
-sentieon_require_prefix() {
-    local prefix="$1"
-    compgen -G "${prefix}*" >/dev/null || sentieon_die "No files found for index prefix: ${prefix}"
-}
-
-sentieon_abs_dir() {
-    local path="$1"
-    (cd "${path}" >/dev/null 2>&1 && pwd)
-}
-
 sentieon_require_reference_fasta() {
     local fasta="$1"
 
@@ -68,20 +53,45 @@ sentieon_require_bwa_index() {
     done
 }
 
-sentieon_require_model_bundle() {
-    local bundle="$1"
+sentieon_resolve_model_bundle() {
+    local input="$1"
     local need_bwa="${2:-false}"
+    local parent=""
+    local base=""
+    local candidate=""
 
-    if [[ -d "${bundle}" ]]; then
-        sentieon_require_file "${bundle}/dnascope.model"
-
-        if [[ "${need_bwa}" == "true" ]]; then
-            sentieon_require_file "${bundle}/bwa.model"
-        fi
+    if [[ -f "${input}" ]]; then
+        printf '%s\n' "${input}"
         return
     fi
 
-    sentieon_require_file "${bundle}"
+    if [[ -d "${input}" ]]; then
+        parent=$(cd "$(dirname "${input}")" >/dev/null 2>&1 && pwd)
+        base=$(basename "${input}")
+
+        for candidate in \
+            "${input}.bundle" \
+            "${parent}/${base}.bundle" \
+            "${parent}/${base%.bundle}.bundle"
+        do
+            if [[ -f "${candidate}" ]]; then
+                echo "WARNING: '${input}' is an unpacked Sentieon model directory. Using sibling bundle archive '${candidate}' for sentieon-cli." >&2
+                printf '%s\n' "${candidate}"
+                return
+            fi
+        done
+
+        if [[ -f "${input}/dnascope.model" ]]; then
+            if [[ "${need_bwa}" == "true" ]]; then
+                sentieon_require_file "${input}/bwa.model"
+            fi
+            sentieon_die "DNAscope model path must point to a .bundle file for sentieon-cli, not an unpacked directory: ${input}"
+        fi
+
+        sentieon_die "DNAscope model bundle path is a directory, but sentieon-cli expects a .bundle file: ${input}"
+    fi
+
+    sentieon_die "Required Sentieon model bundle file not found: ${input}"
 }
 
 sentieon_require_dnascope_cli_stack() {
@@ -118,29 +128,6 @@ sentieon_log_metrics() {
 
     printf '%s\t%s\t%s\t%s\t%s\n' "${caller}" "${pipeline}" "${secs}" "${cpu}" "${rss}" >> "${METRICS}"
     echo "  [METRICS] ${pipeline}: ${wall} wall, ${cpu}% CPU, MaxRSS=${rss} kB"
-}
-
-sentieon_init_license_args() {
-    SENTIEON_DOCKER_LICENSE_ARGS=()
-
-    if [[ -f "${SENTIEON_LICENSE}" ]]; then
-        local license_dir license_name
-        license_dir=$(sentieon_abs_dir "$(dirname "${SENTIEON_LICENSE}")")
-        license_name=$(basename "${SENTIEON_LICENSE}")
-        SENTIEON_DOCKER_LICENSE_ARGS=(
-            -e "SENTIEON_LICENSE=/licenses/${license_name}"
-            -v "${license_dir}:/licenses:ro"
-        )
-    else
-        SENTIEON_DOCKER_LICENSE_ARGS=(-e "SENTIEON_LICENSE=${SENTIEON_LICENSE}")
-    fi
-}
-
-sentieon_set_pcr_arg() {
-    SENTIEON_PCR_ARG=""
-    if [[ "${PCRFREE:-false}" == "true" ]]; then
-        SENTIEON_PCR_ARG="--pcr_indel_model none"
-    fi
 }
 
 sentieon_set_fastq_paths() {

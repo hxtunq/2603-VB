@@ -16,6 +16,7 @@ source "${BAM_PATH_FILE}"
 CALLER="dnascope"
 TIMEFILE="${LOG_DIR}/${COV}x/time/dnascope.time"
 OUTPUT_VCF=""
+MODEL_BUNDLE=""
 CMD=()
 
 sentieon_skip_if_no_license "DNAscope"
@@ -24,7 +25,7 @@ sentieon_require_file "${FINAL_BAM}"
 sentieon_require_reference_fasta "${REF_FASTA}"
 sentieon_require_file "${DBSNP}"
 sentieon_require_vcf_index "${DBSNP}"
-sentieon_require_model_bundle "${DNASCOPE_WGS_MODEL}"
+MODEL_BUNDLE=$(sentieon_resolve_model_bundle "${DNASCOPE_WGS_MODEL}")
 
 sentieon_prepare_layout "${COV}x" "${CALLER}"
 
@@ -34,7 +35,7 @@ CMD=(
     sentieon-cli dnascope
     -r "${REF_FASTA}"
     -i "${FINAL_BAM}"
-    -m "${DNASCOPE_WGS_MODEL}"
+    -m "${MODEL_BUNDLE}"
     -d "${DBSNP}"
     -t "${THREADS}"
     --duplicate_marking none

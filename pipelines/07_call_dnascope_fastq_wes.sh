@@ -13,6 +13,7 @@ CALLER="dnascope_fastq_wes"
 TIMEFILE="${LOG_DIR}/${COV}x_wes/time/dnascope_fastq_wes.time"
 OUTPUT_VCF=""
 READGROUP=""
+MODEL_BUNDLE=""
 CMD=()
 
 sentieon_set_fastq_paths "${COV}" "wes"
@@ -25,7 +26,7 @@ sentieon_require_bwa_index "${REF_FASTA}"
 sentieon_require_file "${DBSNP}"
 sentieon_require_vcf_index "${DBSNP}"
 sentieon_require_file "${EXOME_BED}"
-sentieon_require_model_bundle "${DNASCOPE_WES_MODEL}" "true"
+MODEL_BUNDLE=$(sentieon_resolve_model_bundle "${DNASCOPE_WES_MODEL}" "true")
 
 sentieon_prepare_layout "${COV_SUFFIX}" "${CALLER}"
 
@@ -38,7 +39,7 @@ CMD=(
     --r1_fastq "${FASTQ_R1}"
     --r2_fastq "${FASTQ_R2}"
     --readgroups "${READGROUP}"
-    -m "${DNASCOPE_WES_MODEL}"
+    -m "${MODEL_BUNDLE}"
     -d "${DBSNP}"
     -b "${EXOME_BED}"
     -t "${THREADS}"
