@@ -131,7 +131,7 @@ Benchmark runtime / CPU / RSS are appended per coverage to:
 
 ## Sentieon Notes
 
-Shared-BAM DNAscope and raw-FASTQ DNAscope use the local `sentieon-cli` command. Keep `sentieon-cli` in `PATH`.
+Shared-BAM DNAscope and raw-FASTQ DNAscope use the local `sentieon-cli` command, and `sentieon-cli dnascope` shells out to `sentieon driver`. Keep both `sentieon-cli` and `sentieon` in `PATH`, or set `SENTIEON_BIN_DIR` before sourcing `config/config.sh`.
 
 Required inputs for DNAscope:
 

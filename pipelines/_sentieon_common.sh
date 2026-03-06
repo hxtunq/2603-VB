@@ -96,6 +96,9 @@ sentieon_resolve_model_bundle() {
 
 sentieon_require_dnascope_cli_stack() {
     sentieon_require_command sentieon-cli
+    if ! command -v sentieon >/dev/null 2>&1; then
+        sentieon_die "'sentieon' not found in PATH. sentieon-cli dnascope shells out to 'sentieon driver'. Add the Sentieon genomics bin directory to PATH or set SENTIEON_BIN_DIR before sourcing config/config.sh."
+    fi
 }
 
 sentieon_prepare_layout() {

@@ -113,12 +113,17 @@ rtg format -o chr22.sdf chr22.fa
 
 ### 2.4 Sentieon Assets
 
-Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid license. The `07_call_dnascope*.sh` and `07_call_dnascope_fastq*.sh` scripts invoke the local `sentieon-cli` command directly, so make sure `sentieon-cli` is available in `PATH`. For `sentieon-cli dnascope`, `DNASCOPE_WGS_MODEL` and `DNASCOPE_WES_MODEL` must point to the downloaded `.bundle` files, not unpacked directories.
+Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid license. The `07_call_dnascope*.sh` and `07_call_dnascope_fastq*.sh` scripts invoke the local `sentieon-cli` command directly, and `sentieon-cli dnascope` shells out to `sentieon driver`, so both `sentieon-cli` and `sentieon` must be available in `PATH`. For `sentieon-cli dnascope`, `DNASCOPE_WGS_MODEL` and `DNASCOPE_WES_MODEL` must point to the downloaded `.bundle` files, not unpacked directories.
 
 ```bash
 # pwd: variant-calling-benchmark
 export SENTIEON_LICENSE=/absolute/path/to/sentieon.lic
 # Or: export SENTIEON_LICENSE=license-server-host:port
+export SENTIEON_BIN_DIR=/absolute/path/to/sentieon-genomics-202503.02/bin
+export PATH="${SENTIEON_BIN_DIR}:$PATH"
+
+command -v sentieon-cli
+command -v sentieon
 
 mkdir -p data/reference/models
 

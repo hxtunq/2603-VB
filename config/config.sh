@@ -132,9 +132,18 @@ export HAPPY_IMAGE="jmcdani20/hap.py:v0.3.12"
 
 # Sentieon DNAscope (optional — requires SENTIEON_LICENSE)
 export SENTIEON_VERSION="${SENTIEON_VERSION:-202503.02}"
+export SENTIEON_BIN_DIR="${SENTIEON_BIN_DIR:-}"
+
+if [[ -n "${SENTIEON_BIN_DIR}" ]]; then
+    case ":${PATH}:" in
+        *":${SENTIEON_BIN_DIR}:"*) ;;
+        *) export PATH="${SENTIEON_BIN_DIR}:${PATH}" ;;
+    esac
+fi
 
 # === Sentieon DNAscope Model Bundles ===
 # Download from: https://github.com/Sentieon/sentieon-models
+# sentieon-cli dnascope requires both sentieon-cli and sentieon in PATH.
 # sentieon-cli dnascope expects -m/--model_bundle to be the .bundle archive file.
 # Do not point these variables at unpacked directories.
 # Override DNASCOPE_WGS_MODEL / DNASCOPE_WES_MODEL if you download newer bundles.
