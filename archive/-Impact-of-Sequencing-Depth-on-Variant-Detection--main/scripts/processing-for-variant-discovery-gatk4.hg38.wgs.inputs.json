@@ -1,0 +1,29 @@
+{
+  "PreProcessingForVariantDiscovery_GATK4.sample_name": "HG002",
+  "PreProcessingForVariantDiscovery_GATK4.ref_name": "hg38",
+
+  "PreProcessingForVariantDiscovery_GATK4.flowcell_unmapped_bams_list": "/root/giab_project/scripts/flowcell_unmapped_bams_list.txt",
+  "PreProcessingForVariantDiscovery_GATK4.unmapped_bam_suffix": ".unmapped.bam",
+
+  "PreProcessingForVariantDiscovery_GATK4.ref_dict": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.dict",
+  "PreProcessingForVariantDiscovery_GATK4.ref_fasta": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.fasta",
+  "PreProcessingForVariantDiscovery_GATK4.ref_fasta_index": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.fasta.fai",
+  "PreProcessingForVariantDiscovery_GATK4.ref_alt": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.fasta.64.alt",
+  "PreProcessingForVariantDiscovery_GATK4.ref_sa": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.fasta.64.sa",
+  "PreProcessingForVariantDiscovery_GATK4.ref_amb": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.fasta.64.amb",
+  "PreProcessingForVariantDiscovery_GATK4.ref_bwt": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.fasta.64.bwt",
+  "PreProcessingForVariantDiscovery_GATK4.ref_ann": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.fasta.64.ann",
+  "PreProcessingForVariantDiscovery_GATK4.ref_pac": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.fasta.64.pac",
+
+  "PreProcessingForVariantDiscovery_GATK4.dbSNP_vcf": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.dbsnp138.vcf.gz",
+  "PreProcessingForVariantDiscovery_GATK4.dbSNP_vcf_index": "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.dbsnp138.vcf.gz.tbi",
+
+  "PreProcessingForVariantDiscovery_GATK4.known_indels_sites_VCFs": [
+    "/root/giab_project/reference/hg38/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz",
+    "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.known_indels.vcf.gz"
+  ],
+  "PreProcessingForVariantDiscovery_GATK4.known_indels_sites_indices": [
+    "/root/giab_project/reference/hg38/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz.tbi",
+    "/root/giab_project/reference/hg38/Homo_sapiens_assembly38.known_indels.vcf.gz.tbi"
+  ]
+}

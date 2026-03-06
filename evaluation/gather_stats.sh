@@ -1,37 +1,33 @@
 #!/bin/bash
-# Gather hap.py evaluation statistics into a single TSV
-# Based on: caller_benchmark-main/gather_stats.sh
-# Supports multi-coverage structure: ${EVAL_DIR}/{COV}x/{WGS|WES}/{caller}_eval_data/
+# Gather hap.py evaluation statistics into a single TSV.
 
-set -e
+set -euo pipefail
 
-source "$(dirname "$0")/../config/config.sh"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
-OUTPUT_TSV="${EVAL_DIR}/all_stats.tsv"
+source "${SCRIPT_DIR}/../config/config.sh"
 
-# Find first report for header
-FIRST_REPORT=$(find "${EVAL_DIR}" -name "report.extended.csv" 2>/dev/null | head -n1)
+EVAL_ROOT="${1:-${EVAL_DIR}}"
+OUTPUT_TSV="${2:-${EVAL_ROOT}/all_stats.tsv}"
+
+FIRST_REPORT=$(find "${EVAL_ROOT}" -name "report.extended.csv" 2>/dev/null | sort | head -n1)
 if [[ -z "${FIRST_REPORT}" ]]; then
-    echo "ERROR: No report.extended.csv found in ${EVAL_DIR}/"
+    echo "ERROR: No report.extended.csv found in ${EVAL_ROOT}/"
     exit 1
 fi
 
-echo "Gathering stats from ${EVAL_DIR}..."
+echo "Gathering stats from ${EVAL_ROOT}..."
 
-# Header: prepend Coverage, Mode, Caller columns
 head -n1 "${FIRST_REPORT}" | sed 's/^/Coverage\tMode\tCaller\t/' | tr ',' '\t' > "${OUTPUT_TSV}"
 
-# Data rows — walk all report files recursively
-find "${EVAL_DIR}" -name "report.extended.csv" | sort | while IFS= read -r REPORT; do
-    # Extract coverage, mode, caller from path
-    # Expected path: ${EVAL_DIR}/{COV}x({_wes})/{WGS|WES}/{caller}_eval_data/report.extended.csv
-    REL_PATH="${REPORT#${EVAL_DIR}/}"
-    COV=$(echo "${REL_PATH}" | cut -d'/' -f1)         # e.g. 10x or 50x_wes
-    MODE=$(echo "${REL_PATH}" | cut -d'/' -f2)         # e.g. WGS or WES
-    CALLER=$(echo "${REL_PATH}" | cut -d'/' -f3 | sed 's/_eval_data//')  # e.g. gatk
+find "${EVAL_ROOT}" -name "report.extended.csv" | sort | while IFS= read -r report; do
+    rel_path="${report#${EVAL_ROOT}/}"
+    cov=$(echo "${rel_path}" | cut -d'/' -f1)
+    mode=$(echo "${rel_path}" | cut -d'/' -f2)
+    caller=$(echo "${rel_path}" | cut -d'/' -f3 | sed 's/_eval_data//')
 
-    tail -n +2 "${REPORT}" | while IFS= read -r line; do
-        echo -e "${COV}\t${MODE}\t${CALLER}\t$(echo "${line}" | tr ',' '\t')"
+    tail -n +2 "${report}" | while IFS= read -r line; do
+        printf '%s\t%s\t%s\t%s\n' "${cov}" "${mode}" "${caller}" "$(echo "${line}" | tr ',' '\t')"
     done >> "${OUTPUT_TSV}"
 done
 

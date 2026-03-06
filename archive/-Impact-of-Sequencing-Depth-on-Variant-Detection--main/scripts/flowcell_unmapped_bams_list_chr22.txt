@@ -1,0 +1,1 @@
+/root/giab_project/data/bam/Sample_HG002_chr22.unmapped.bam

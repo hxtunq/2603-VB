@@ -1,130 +1,160 @@
 # Variant Calling Benchmark
 
-Hệ thống benchmark so sánh hiệu suất các công cụ gọi biến thể (variant caller) trên dữ liệu giả lập từ chromosome 22 (hg38). Thiết kế theo phương pháp luận của [Barbitoff et al. 2022, BMC Genomics](https://doi.org/10.1186/s12864-022-08365-3).
+Benchmark variant callers on simulated `chr22` Illumina data with two explicit tracks:
 
-## Tổng quan
+- Track A: fair head-to-head comparison on the same shared dedup BAM
+- Track B: supplementary Sentieon pangenome end-to-end pipeline, reported separately
 
-```
-chr22.fa (hg38)
-    │
-    ├── simuG → 18K SNPs + 2.5K INDELs (truth VCF)
-    │
-    └── ART Illumina (6 mức coverage: 10x, 20x, 30x, 50x, 100x, 200x)
-            │
-            └── BWA-MEM → MarkDuplicates → dedup BAM
-                    │
-                    ├── GATK HC: BQSR → HaplotypeCaller → CNN/Hard Filter
-                    ├── DeepVariant, Strelka2+Manta, FreeBayes, DNAscope
-                    │
-                    ├── WGS: 5 callers × 6 coverages
-                    └── WES: 5 callers × 3 coverages (≥50x)
-                            │
-                            └── hap.py + vcfeval → F1, Precision, Recall
-```
+The repository keeps WGS and WES as separate study modes and does not merge pangenome results into the main ranking.
 
-**Tổng cộng:** ~45 VCFs → đánh giá cả WGS lẫn WES với stratification regions.
+## Current Scope
 
-## Cấu trúc thư mục
+Implemented benchmark components:
 
-```
+- Shared preprocessing: alignment, sorting, duplicate marking, coverage stats
+- Track A callers:
+  - GATK HaplotypeCaller
+  - DeepVariant
+  - Strelka2 + Manta
+  - FreeBayes
+  - Sentieon DNAscope
+- Track B callers:
+  - Sentieon DNAscope Pangenome WGS
+  - Sentieon DNAscope Pangenome WES
+- Truth-based evaluation with hap.py + RTG vcfeval
+- Summary plots from `results/eval/all_stats.tsv` and `results/eval_track_b/all_stats.tsv`
+
+Not implemented in this repo:
+
+- SnpEff / dbNSFP / ClinVar annotation pipeline
+- AlphaGenome functional-risk scoring
+
+Those items are now future work only, not runnable workflow steps.
+
+## Study Design
+
+Main coverage grid:
+
+- WGS: `10x 20x 30x 50x`
+- WES: `50x 100x 200x`
+
+Design rules:
+
+- Track A is the primary benchmark result because every caller sees the same dedup BAM.
+- Track B is supplementary because pangenome alignment changes the input BAM and cannot be interpreted as a fair caller-only comparison.
+- The archived `-Impact-of-Sequencing-Depth-on-Variant-Detection--main` project is an HG002 chr22 exome downsampling study. Its findings are useful only as qualitative coverage guidance, not as WGS-vs-WES evidence.
+
+## Repository Layout
+
+```text
 variant-calling-benchmark/
 ├── config/
-│   └── config.sh                    # Cấu hình chung (resources, paths, params)
-│
-├── pipelines/                       # Scripts gọi biến thể
-│   ├── 03_call_hc.sh                # GATK HC (BQSR + Hard Filter)
-│   ├── 03_call_hc_wes.sh            # GATK HC — WES mode (-L exome BED)
-│   ├── 04_call_dv.sh                # DeepVariant WGS
-│   ├── 04_call_dv_wes.sh            # DeepVariant WES (--model_type=WES)
-│   ├── 05_call_strelka.sh           # Manta + Strelka2 WGS
-│   ├── 05_call_strelka_wes.sh       # Manta + Strelka2 WES (--exome)
-│   ├── 06_call_freebayes.sh         # FreeBayes WGS
-│   ├── 06_call_freebayes_wes.sh     # FreeBayes WES (--targets)
-│   ├── 07_call_dnascope.sh          # Sentieon DNAscope WGS (optional)
-│   └── 07_call_dnascope_wes.sh      # Sentieon DNAscope WES (optional)
-│
+│   └── config.sh
 ├── evaluation/
-│   ├── eval_happy.sh                # hap.py evaluation (multi-coverage, WGS+WES)
-│   └── gather_stats.sh              # Thu thập kết quả vào TSV
-│
+│   ├── _happy_common.sh
+│   ├── eval_happy.sh
+│   ├── eval_happy_track_b.sh
+│   └── gather_stats.sh
+├── pipelines/
+│   ├── _sentieon_common.sh
+│   ├── 03_call_hc*.sh
+│   ├── 04_call_dv*.sh
+│   ├── 05_call_strelka*.sh
+│   ├── 06_call_freebayes*.sh
+│   ├── 07_call_dnascope*.sh
+│   └── 07_call_dnascope_pangenome*.sh
 ├── visualization/
-│   ├── benchmark_plots.R            # R script vẽ biểu đồ benchmark
-│   └── plot_summary.py              # Python summary plots
-│
-├── workflow.md                      # Quy trình chi tiết từng bước (copy-paste ready)
-└── caller_benchmark-main/           # Reference code từ Barbitoff et al. 2022
+│   ├── benchmark_plots.R
+│   └── plot_summary.py
+├── workflow.md
+└── archive/
 ```
 
-## Variant Callers
+## Quick Start
 
-| # | Caller | WGS | WES | Filter strategy |
-|---|--------|-----|-----|-----------------|
-| 1 | **GATK HaplotypeCaller** | ✅ | ✅ | Hard Filter (GATK Best Practices) |
-| 2 | **DeepVariant** v1.9.0 | ✅ | ✅ | Default (model-based) |
-| 3 | **Strelka2** v2.9.10 | ✅ | ✅ | Default (with Manta indel candidates) |
-| 4 | **FreeBayes** v1.3.10 | ✅ | ✅ | QUAL + strand bias filters |
-| 5 | **DNAscope** (Sentieon) | ✅ | ✅ | ML model (optional, cần license) |
-
-## Coverage Design
-
-| Coverage | WGS eval | WES eval | Mục đích |
-|----------|----------|----------|----------|
-| 10x | ✅ | — | Low coverage stress test |
-| 20x | ✅ | — | Gần GIAB WGS (~22x) |
-| 30x | ✅ | — | Standard clinical WGS |
-| 50x | ✅ | ✅ | High WGS / Low WES |
-| 100x | ✅ | ✅ | Medium WES |
-| 200x | ✅ | ✅ | Gần GIAB WES (~200x) |
-
-## Cách chạy
-
-Xem chi tiết trong [workflow.md](workflow.md). Tóm tắt:
+`workflow.md` contains the detailed setup commands. The high-level execution order is:
 
 ```bash
-# 1. Setup
 source config/config.sh
 
-# 2. Simulate (simuG → ART multi-coverage)
-# Xem workflow.md §2.3–2.5
+# Build RTG SDF once before hap.py/vcfeval
+rtg format -o "${RTG_SDF}" "${REF_FASTA}"
 
-# 3. Preprocessing (per coverage)
-# Xem workflow.md Part III
+# Prepare references, truth set, simulated FASTQs, and shared preprocessing
+# See workflow.md for the full commands
 
-# 4. Variant calling
-for COV in 10 20 30 50 100 200; do
-  export PREPROC_DIR="results/preprocessing/${COV}x"
-  source "${PREPROC_DIR}/bam_path.sh"
-  bash pipelines/03_call_hc.sh
-  bash pipelines/04_call_dv.sh
-  bash pipelines/05_call_strelka.sh
-  bash pipelines/06_call_freebayes.sh
-  bash pipelines/07_call_dnascope.sh  # optional
+# Track A: fair comparison on shared BAMs
+for COV in 10 20 30 50; do
+  bash pipelines/03_call_hc.sh "${COV}"
+  bash pipelines/04_call_dv.sh "${COV}"
+  bash pipelines/05_call_strelka.sh "${COV}"
+  bash pipelines/06_call_freebayes.sh "${COV}"
+  bash pipelines/07_call_dnascope.sh "${COV}"
 done
 
-# 5. Evaluate
+for COV in 50 100 200; do
+  bash pipelines/03_call_hc_wes.sh "${COV}"
+  bash pipelines/04_call_dv_wes.sh "${COV}"
+  bash pipelines/05_call_strelka_wes.sh "${COV}"
+  bash pipelines/06_call_freebayes_wes.sh "${COV}"
+  bash pipelines/07_call_dnascope_wes.sh "${COV}"
+done
+
+# Track B: supplementary Sentieon pangenome runs
+for COV in 10 20 30 50; do
+  bash pipelines/07_call_dnascope_pangenome.sh "${COV}"
+done
+
+for COV in 50 100 200; do
+  bash pipelines/07_call_dnascope_pangenome_wes.sh "${COV}"
+done
+
+# Evaluation
 bash evaluation/eval_happy.sh
+bash evaluation/eval_happy_track_b.sh
 
-# 6. Visualize
-Rscript visualization/benchmark_plots.R
+# Visualization
+Rscript visualization/benchmark_plots.R results/eval/all_stats.tsv results/plots
+python visualization/plot_summary.py results/eval/all_stats.tsv results/plots
 ```
 
-## Đánh giá
+## Outputs
 
-- **Tool:** hap.py + RTGtools vcfeval
-- **Metrics:** F1 Score, Precision, Recall (SNP + INDEL riêng)
-- **Stratification:** CDS regions, Exome targets, Low-mappability regions
-- **Statistical power:** Nhiều coverage levels → boxplot + so sánh xu hướng
+Track A:
 
-## Tham khảo
+- Variant calls: `results/variants/{coverage}/...` and `results/variants/{coverage}_wes/...`
+- Evaluation: `results/eval/...`
+- Aggregated stats: `results/eval/all_stats.tsv`
 
-```bash
-# WGS coverages
-for cov in 10 20 30 50; do
-    bash pipelines/03_call_hc.sh $cov
-done
+Track B:
 
-# WES coverages
-for cov in 50 100 200; do
-    bash pipelines/03_call_hc_wes.sh $cov
-done
-```
+- Variant calls: `results/variants/{coverage}/dnascope_pangenome/...` and `results/variants/{coverage}_wes/dnascope_pangenome_wes/...`
+- Evaluation: `results/eval_track_b/...`
+- Aggregated stats: `results/eval_track_b/all_stats.tsv`
+
+Benchmark runtime / CPU / RSS are appended per coverage to:
+
+- `logs/{coverage}/benchmark_metrics.tsv`
+- `logs/{coverage}_wes/benchmark_metrics.tsv`
+
+## Sentieon Notes
+
+The repo is standardized on Docker for Sentieon execution.
+
+Required inputs for DNAscope:
+
+- `SENTIEON_LICENSE`
+- `DNASCOPE_WGS_MODEL`
+- `DNASCOPE_WES_MODEL`
+- `PANGENOME_INDEX` for Track B
+
+Track A DNAscope uses the shared dedup BAM directly. This is the fair-comparison path and matches official Sentieon support for variant calling from sorted BAM/CRAM.
+
+Track B DNAscope Pangenome starts from the simulated FASTQs and uses `bwa-mem2-pangenome`, so its result must stay separate from the main benchmark tables.
+
+## References
+
+- Sentieon pangenome usage: https://support.sentieon.com/versions/202503.02/docs/Pangenome_usage/pangenome/
+- Sentieon CLI docs: https://support.sentieon.com/docs/sentieon_cli/
+- Sentieon models: https://github.com/Sentieon/sentieon-models
+- Archived depth study: `archive/-Impact-of-Sequencing-Depth-on-Variant-Detection--main/`

@@ -1,0 +1,7 @@
+All preprocessing steps followed GATK Best Practices and were executed locally using Cromwell (v81) under WSL2 (Ubuntu) on a Windows system with 16 GB RAM and 8 CPU cores. Because the original GATK WDL workflows are optimized for cloud environments, targeted modifications were applied to enable stable execution on limited local hardware.
+
+Docker was used as the execution backend, with container memory capped at 15 GB to reserve system resources for WSL overhead. Workflow concurrency was restricted to a single task at a time to prevent memory contention. The BaseRecalibrator task was specifically optimized by reducing container memory allocation (6 GB → 3.5 GB) and fixing the Java heap size at 2 GB. These adjustments ensured successful execution of the most memory-intensive steps, particularly BWA-MEM alignment (~14 GB RAM), without out-of-memory failures.
+
+Workflow inputs were provided through JSON configuration files, which were adapted to use absolute local file paths for all reference files, known variant resources, and input BAM files. Multiple sequencing lanes or flowcells were handled by listing query-sorted unmapped BAM files in a dedicated flowcell input file, allowing Cromwell to merge data consistently while preserving read group information.
+
+All workflows were executed using absolute file paths and version-controlled reference resources, ensuring reproducibility across systems with similar hardware constraints.

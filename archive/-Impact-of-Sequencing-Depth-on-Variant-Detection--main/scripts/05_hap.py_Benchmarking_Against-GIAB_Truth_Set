@@ -1,0 +1,54 @@
+#!/bin/bash
+set -euo pipefail
+
+# Make conda available in non-interactive shells
+source "$(conda info --base)/etc/profile.d/conda.sh"
+# ============================================================
+# GIAB Benchmarking using hap.py (chr22, Exome Regions)
+# ============================================================
+
+cd ~/giab_project/results
+
+# ------------------------------------------------------------
+# Step 1: Activate hap.py environment
+# ------------------------------------------------------------
+conda activate hapy_py27
+
+# ------------------------------------------------------------
+# Step 2: Define reference and truth resources
+# ------------------------------------------------------------
+TRUTH_VCF=~/giab_project/data/truth_vcf/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
+TRUTH_BED=~/giab_project/data/bed/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed
+EXOME_BED=~/giab_project/data/bed/Exome-Agilent_V5_chr22.bed
+REF=~/giab_project/reference/hg38/Homo_sapiens_assembly38.fasta
+
+# ------------------------------------------------------------
+# Step 3: Run hap.py for each coverage depth
+# ------------------------------------------------------------
+for vcf in HG002.chr22.{2,10,40,80}x.vcf.gz; do
+    name=${vcf%.vcf.gz}
+
+    echo "Running hap.py on $vcf"
+
+    hap.py \
+        $TRUTH_VCF \
+        $vcf \
+        -f $TRUTH_BED \
+        -T $EXOME_BED \
+        -r $REF \
+        -o ${name}.happy \
+        --threads 4
+done
+
+# ------------------------------------------------------------
+# Step 4: Inspect hap.py summary outputs
+# ------------------------------------------------------------
+conda activate ngs1
+
+for cov in 2 10 40 80; do
+    echo "=============================="
+    echo "Coverage: ${cov}x"
+    echo "=============================="
+    cat HG002.chr22.${cov}x.happy.summary.csv
+    echo ""
+done

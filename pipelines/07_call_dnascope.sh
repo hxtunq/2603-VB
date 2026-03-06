@@ -1,123 +1,75 @@
 #!/bin/bash
-# Sentieon DNAscope — WGS Mode
-# Requires: SENTIEON_LICENSE env var or license file
-# DNAscope is a machine-learning based variant caller from Sentieon
-# Optional: skip gracefully if Sentieon is not available
-# Metrics: runtime + Max RSS
+# Sentieon DNAscope — WGS mode on the shared dedup BAM.
 
-set -e
+set -euo pipefail
 
-COV="${1:?Usage: $0 <coverage>  (e.g. 10, 20, 30, 50, 100, 200)}"
+COV="${1:?Usage: $0 <coverage>  (e.g. 10, 20, 30, 50)}"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
-source "$(dirname "$0")/../config/config.sh"
-source "${PREPROC_DIR}/${COV}x/bam_path.sh"
+source "${SCRIPT_DIR}/../config/config.sh"
+source "${SCRIPT_DIR}/_sentieon_common.sh"
+
+BAM_PATH_FILE="${PREPROC_DIR}/${COV}x/bam_path.sh"
+sentieon_require_file "${BAM_PATH_FILE}"
+source "${BAM_PATH_FILE}"
 
 CALLER="dnascope"
-OUT_DIR="${VARIANT_DIR}/${COV}x/${CALLER}"
-TIMEDIR="${LOG_DIR}/${COV}x/time"
-mkdir -p "${OUT_DIR}" "${TIMEDIR}"
+TIMEFILE="${LOG_DIR}/${COV}x/time/dnascope.time"
 
-METRICS="${LOG_DIR}/${COV}x/benchmark_metrics.tsv"
-if [[ ! -f "${METRICS}" ]]; then
-    echo -e "Caller\tPipeline\tWallClock_sec\tCPU_percent\tMaxRSS_kB" > "${METRICS}"
-fi
+sentieon_skip_if_no_license "DNAscope"
+sentieon_require_command docker
+sentieon_require_file "${FINAL_BAM}"
+sentieon_require_file "${REF_FASTA}"
+sentieon_require_file "${DBSNP}"
+sentieon_require_file "${DNASCOPE_WGS_MODEL}/dnascope.model"
 
-log_metrics() {
-    local caller="$1" pipeline="$2" timefile="$3"
-    local wall cpu rss
-    wall=$(awk -F': ' '/Elapsed \(wall clock\) time/{print $2}' "$timefile")
-    cpu=$(awk -F': ' '/Percent of CPU this job got/{print $2}' "$timefile" | tr -d '%')
-    rss=$(awk -F': ' '/Maximum resident set size \(kbytes\)/{print $2}' "$timefile")
-    local secs
-    secs=$(echo "$wall" | awk -F: '{if(NF==3) print $1*3600+$2*60+$3; else print $1*60+$2}')
-    echo -e "${caller}\t${pipeline}\t${secs}\t${cpu}\t${rss}" >> "${METRICS}"
-    echo "  [METRICS] ${pipeline}: ${wall} wall, ${cpu}% CPU, MaxRSS=${rss} kB"
-}
+sentieon_prepare_layout "${COV}x" "${CALLER}"
+sentieon_init_license_args
+sentieon_set_pcr_arg
 
-# --- Check Sentieon license ---
-if [[ -z "${SENTIEON_LICENSE}" ]]; then
-    echo "WARNING: SENTIEON_LICENSE not set. Skipping DNAscope."
-    echo "  To use DNAscope, set SENTIEON_LICENSE to your license server or file."
-    echo "  Academic users: request free eval at https://www.sentieon.com/free-trial/"
-    exit 0
-fi
+ABS_REF_DIR=$(sentieon_abs_dir "${REF_DIR}")
+ABS_PREPROC_DIR=$(sentieon_abs_dir "$(dirname "${FINAL_BAM}")")
+ABS_OUT_DIR=$(sentieon_abs_dir "${OUT_DIR}")
+ABS_MODEL_DIR=$(sentieon_abs_dir "${DNASCOPE_WGS_MODEL}")
 
-# Check if sentieon is available (either system-installed or Docker)
-USE_DOCKER=false
-if ! command -v sentieon &>/dev/null; then
-    echo "sentieon not found in PATH, will use Docker image: ${SENTIEON_IMAGE}"
-    USE_DOCKER=true
-fi
+REF_BASENAME=$(basename "${REF_FASTA}")
+DBSNP_BASENAME=$(basename "${DBSNP}")
+BAM_BASENAME=$(basename "${FINAL_BAM}")
 
-echo "=== Running Sentieon DNAscope (WGS) ==="
+echo "=== Running Sentieon DNAscope (WGS, shared BAM) ==="
 
-if [[ "${USE_DOCKER}" == "true" ]]; then
-    ABS_REF_DIR=$(cd "${REF_DIR}" && pwd)
-    ABS_PREPROC_DIR=$(cd "${PREPROC_DIR}/${COV}x" && pwd)
-    ABS_OUT_DIR=$(cd "${OUT_DIR}" && pwd)
-    
-    BAM_BASENAME=$(basename "${FINAL_BAM}")
-    REF_BASENAME=$(basename "${REF_FASTA}")
-    DBSNP_BASENAME=$(basename "${DBSNP}")
-    
-    /usr/bin/time -v -o "${TIMEDIR}/dnascope.time" bash -c "
-        set -e
-        # Step 1: DNAscope calling
-        docker run --rm \
-            -e SENTIEON_LICENSE='${SENTIEON_LICENSE}' \
-            -v '${ABS_REF_DIR}:/ref:ro' \
-            -v '${ABS_PREPROC_DIR}:/input:ro' \
-            -v '${ABS_OUT_DIR}:/output' \
-            ${SENTIEON_IMAGE} \
-            sentieon driver \
-            -r '/ref/${REF_BASENAME}' \
-            -i '/input/${BAM_BASENAME}' \
-            -t ${THREADS} \
-            --algo DNAscope \
-            -d '/ref/${DBSNP_BASENAME}' \
-            '/output/${PREFIX}_DNASCOPE_TMP.vcf'
-
-        # Step 2: Apply DNAscope ML model
-        docker run --rm \
-            -e SENTIEON_LICENSE='${SENTIEON_LICENSE}' \
-            -v '${ABS_REF_DIR}:/ref:ro' \
-            -v '${ABS_OUT_DIR}:/output' \
-            ${SENTIEON_IMAGE} \
-            sentieon driver \
-            -r '/ref/${REF_BASENAME}' \
-            -t ${THREADS} \
-            --algo DNAModelApply \
-            --model '/opt/sentieon/share/dnascope_models/SentieonDNAscopeModel1.1.model' \
-            -v '/output/${PREFIX}_DNASCOPE_TMP.vcf' \
-            '/output/${PREFIX}_DNASCOPE.vcf'
-    "
-else
-    # System-installed sentieon
-    /usr/bin/time -v -o "${TIMEDIR}/dnascope.time" bash -c "
-        set -e
+/usr/bin/time -v -o "${TIMEFILE}" \
+    docker run --rm \
+    "${SENTIEON_DOCKER_LICENSE_ARGS[@]}" \
+    -v "${ABS_REF_DIR}:/ref:ro" \
+    -v "${ABS_PREPROC_DIR}:/input:ro" \
+    -v "${ABS_OUT_DIR}:/output" \
+    -v "${ABS_MODEL_DIR}:/model:ro" \
+    "${SENTIEON_IMAGE}" \
+    bash -lc "
+        set -euo pipefail
         sentieon driver \
-            -r '${REF_FASTA}' \
-            -i '${FINAL_BAM}' \
+            -r /ref/${REF_BASENAME} \
             -t ${THREADS} \
-            --algo DNAscope \
-            -d '${DBSNP}' \
-            '${OUT_DIR}/${PREFIX}_DNASCOPE_TMP.vcf'
+            -i /input/${BAM_BASENAME} \
+            --algo DNAscope ${SENTIEON_PCR_ARG} \
+            --model /model/dnascope.model \
+            -d /ref/${DBSNP_BASENAME} \
+            /output/${PREFIX}_DNASCOPE_TMP.vcf
 
         sentieon driver \
-            -r '${REF_FASTA}' \
+            -r /ref/${REF_BASENAME} \
             -t ${THREADS} \
             --algo DNAModelApply \
-            --model /opt/sentieon/share/dnascope_models/SentieonDNAscopeModel1.1.model \
-            -v '${OUT_DIR}/${PREFIX}_DNASCOPE_TMP.vcf' \
-            '${OUT_DIR}/${PREFIX}_DNASCOPE.vcf'
+            --model /model/dnascope.model \
+            -v /output/${PREFIX}_DNASCOPE_TMP.vcf \
+            /output/${PREFIX}_DNASCOPE.vcf
     "
-fi
 
-log_metrics "dnascope" "DNAscope" "${TIMEDIR}/dnascope.time"
+sentieon_log_metrics "dnascope" "DNAscope" "${TIMEFILE}"
 
-# Clean up temp file
 rm -f "${OUT_DIR}/${PREFIX}_DNASCOPE_TMP.vcf" "${OUT_DIR}/${PREFIX}_DNASCOPE_TMP.vcf.idx"
 
-echo ""
+echo
 echo "DNAscope done: ${OUT_DIR}/${PREFIX}_DNASCOPE.vcf"
 echo "Metrics: ${METRICS}"

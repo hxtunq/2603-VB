@@ -29,7 +29,8 @@ export JAVA_OPTS="-Xmx${JAVA_HEAP} -XX:ParallelGCThreads=2"
 #-------------------------------------------------------------------------------
 # DIRECTORY PATHS
 #-------------------------------------------------------------------------------
-export PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+CONFIG_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+export PROJECT_DIR="${PROJECT_DIR:-$(cd "${CONFIG_DIR}/.." && pwd)}"
 export DATA_DIR="${PROJECT_DIR}/data"
 export REF_DIR="${DATA_DIR}/reference"
 export SIM_DIR="${DATA_DIR}/simulated"
@@ -40,6 +41,7 @@ export PREPROC_DIR="${RESULTS_DIR}/preprocessing"
 export VARIANT_DIR="${RESULTS_DIR}/variants"
 export BENCH_DIR="${RESULTS_DIR}/benchmarks"
 export EVAL_DIR="${RESULTS_DIR}/eval"
+export EVAL_TRACK_B_DIR="${RESULTS_DIR}/eval_track_b"
 export FIGURE_DIR="${RESULTS_DIR}/plots"
 export METRICS_DIR="${RESULTS_DIR}/final_metrics"
 
@@ -129,8 +131,23 @@ export RTG_IMAGE="biocontainers/rtg-tools:3.12.1--hdfd78af_0"
 export HAPPY_IMAGE="jmcdani20/hap.py:v0.3.12"
 
 # Sentieon DNAscope (optional — requires SENTIEON_LICENSE)
-export SENTIEON_VERSION="202308.03"
-export SENTIEON_IMAGE="sentieon/sentieon:${SENTIEON_VERSION}"
+export SENTIEON_VERSION="${SENTIEON_VERSION:-202503.02}"
+export SENTIEON_IMAGE="${SENTIEON_IMAGE:-sentieon/sentieon:${SENTIEON_VERSION}}"
+
+# === Sentieon DNAscope Model Bundles ===
+# Download from: https://github.com/Sentieon/sentieon-models
+# WGS: DNAscopeIlluminaWGS2.0.bundle
+# WES: DNAscopeIlluminaWES2.0.bundle
+export DNASCOPE_WGS_MODEL="${DNASCOPE_WGS_MODEL:-${REF_DIR}/models/DNAscopeIlluminaWGS2.0.bundle}"
+export DNASCOPE_WES_MODEL="${DNASCOPE_WES_MODEL:-${REF_DIR}/models/DNAscopeIlluminaWES2.0.bundle}"
+
+# === Pangenome Reference ===
+# Built with: sentieon bwa-mem2-pangenome index <ref.fa> <variants.vcf.gz>
+# variants.vcf.gz = population variants (e.g., 1000G common SNPs)
+export PANGENOME_INDEX="${PANGENOME_INDEX:-${REF_DIR}/pangenome/grch38_pangenome}"
+
+# PCR-free library prep (affects DNAscope indel model)
+export PCRFREE="${PCRFREE:-true}"
 
 #-------------------------------------------------------------------------------
 # BENCHMARKING
