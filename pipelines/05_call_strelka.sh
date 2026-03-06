@@ -113,10 +113,10 @@ log_metrics "strelka2" "Strelka2" "${TIMEDIR}/strelka2.time"
 
 # --- Copy output ---
 cp "${OUT_DIR}/strelkawd/results/variants/variants.vcf.gz" \
-   "${OUT_DIR}/${PREFIX}_STRELKA_STANDART.vcf.gz"
+   "${OUT_DIR}/${PREFIX}_STRELKA_STANDARD.vcf.gz"
 
 echo ""
 echo "Strelka2 done (with Manta candidate indels):"
 echo "  Manta candidates: ${CANDIDATE_INDELS}"
-echo "  Strelka output:   ${OUT_DIR}/${PREFIX}_STRELKA_STANDART.vcf.gz"
+echo "  Strelka output:   ${OUT_DIR}/${PREFIX}_STRELKA_STANDARD.vcf.gz"
 echo "Metrics: ${METRICS}"

@@ -58,12 +58,12 @@ echo "=== Running DeepVariant ${DEEPVARIANT_VERSION} (WES) ==="
     --ref="/ref/${REF_BASENAME}" \
     --reads="/input/${BAM_BASENAME}" \
     --regions="/ref/${BED_BASENAME}" \
-    --output_vcf="/output/${PREFIX}_DV_STANDART.vcf" \
+    --output_vcf="/output/${PREFIX}_DV_STANDARD.vcf" \
     --output_gvcf="/output/${PREFIX}_DV.g.vcf" \
     --num_shards=${THREADS}
 
 log_metrics "deepvariant_wes" "DeepVariant_WES" "${TIMEDIR}/deepvariant_wes.time"
 
 echo ""
-echo "DV WES done: ${OUT_DIR}/${PREFIX}_DV_STANDART.vcf"
+echo "DV WES done: ${OUT_DIR}/${PREFIX}_DV_STANDARD.vcf"
 echo "Metrics: ${METRICS}"

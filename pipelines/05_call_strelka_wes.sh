@@ -121,9 +121,9 @@ echo "=== Running Strelka2 (WES + exome mode) ==="
 log_metrics "strelka2_wes" "Strelka2_WES" "${TIMEDIR}/strelka2_wes.time"
 
 cp "${OUT_DIR}/strelkawd/results/variants/variants.vcf.gz" \
-   "${OUT_DIR}/${PREFIX}_STRELKA_STANDART.vcf.gz"
+   "${OUT_DIR}/${PREFIX}_STRELKA_STANDARD.vcf.gz"
 
 echo ""
 echo "Strelka2 WES done (with Manta, exome mode):"
-echo "  Output: ${OUT_DIR}/${PREFIX}_STRELKA_STANDART.vcf.gz"
+echo "  Output: ${OUT_DIR}/${PREFIX}_STRELKA_STANDARD.vcf.gz"
 echo "Metrics: ${METRICS}"
