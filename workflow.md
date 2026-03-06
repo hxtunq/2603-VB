@@ -1,6 +1,7 @@
 ## Workflow
 
 This file documents the implemented benchmark only. Annotation-heavy stages such as SnpEff, dbNSFP, ClinVar, and AlphaGenome are future work and are not part of the runnable pipeline in this repo.
+Each runnable shell block starts with a `# pwd:` comment showing the expected working directory.
 
 ## 1. Setup
 
@@ -24,7 +25,7 @@ source config/config.sh
 ### 2.1 Reference FASTA
 
 ```bash
-cd data/reference
+# pwd: variant-calling-benchmark/data/reference
 
 wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/chr22.fa.gz
 gunzip chr22.fa.gz
@@ -37,7 +38,7 @@ gatk CreateSequenceDictionary -R chr22.fa -O chr22.dict
 ### 2.2 Known Sites For BQSR
 
 ```bash
-cd data/reference
+# pwd: variant-calling-benchmark/data/reference
 
 wget -c https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.dbsnp138.vcf
 wget -c https://storage.googleapis.com/gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.dbsnp138.vcf.idx
@@ -62,7 +63,7 @@ tabix -p vcf 1000G_phase1.snps.high_confidence.hg38.chr22.vcf.gz
 ### 2.3 BED Assets And hap.py Support Files
 
 ```bash
-cd data/reference
+# pwd: variant-calling-benchmark/data/reference
 
 wget -O CDS-canonical.bed \
   https://raw.githubusercontent.com/AstraZeneca-NGS/reference_data/master/hg38/bed/CDS-canonical.bed
@@ -115,6 +116,7 @@ rtg format -o chr22.sdf chr22.fa
 Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid license. The `07_call_dnascope*.sh` and `07_call_dnascope_fastq*.sh` scripts use the local `sentieon-cli` stack, so make sure `sentieon-cli`, `sentieon`, `samtools`, and `multiqc` are available in `PATH`. This repo expects DNAscope model bundles that provide `dnascope.model`, and the FASTQ workflows also need `bwa.model`.
 
 ```bash
+# pwd: variant-calling-benchmark
 export SENTIEON_LICENSE=/absolute/path/to/sentieon.lic
 # Or: export SENTIEON_LICENSE=license-server-host:port
 
@@ -159,7 +161,7 @@ export DNASCOPE_WES_MODEL="$PWD/data/reference/models/DNAscopeIlluminaWES2.1"
 ### 3.1 Truth VCF From simuG
 
 ```bash
-cd data
+# pwd: variant-calling-benchmark/data
 
 git clone https://github.com/yjx1217/simuG.git
 
@@ -189,7 +191,7 @@ tabix -p vcf simulated/SIMULATED_SAMPLE_chr22_truth.vcf.gz
 ### 3.2 WGS FASTQs
 
 ```bash
-cd data
+# pwd: variant-calling-benchmark/data
 
 SIM_DIR="simulated"
 PREFIX="SIMULATED_SAMPLE_chr22"
@@ -218,7 +220,7 @@ done
 ### 3.3 WES FASTQs
 
 ```bash
-cd data
+# pwd: variant-calling-benchmark/data
 
 SIM_DIR="simulated"
 PREFIX="SIMULATED_SAMPLE_chr22"
@@ -255,6 +257,7 @@ The shared preprocessing BAM is the only valid input for Track A comparisons.
 ### 4.1 Alignment And Sort
 
 ```bash
+# pwd: variant-calling-benchmark
 PREFIX="SIMULATED_SAMPLE_chr22"
 REF="data/reference/chr22.fa"
 
@@ -290,6 +293,7 @@ done
 ### 4.2 MarkDuplicates And Coverage Stats
 
 ```bash
+# pwd: variant-calling-benchmark
 PREFIX="SIMULATED_SAMPLE_chr22"
 
 for COV in 10 20 30 50; do
@@ -338,6 +342,7 @@ done
 ### 5.1 Track A: Shared BAM
 
 ```bash
+# pwd: variant-calling-benchmark
 for COV in 10 20 30 50; do
   bash pipelines/03_call_hc.sh "${COV}"
   bash pipelines/04_call_dv.sh "${COV}"
@@ -360,6 +365,7 @@ done
 Optional end-to-end DNAscope from the simulated raw FASTQs:
 
 ```bash
+# pwd: variant-calling-benchmark
 for COV in 10 20 30 50; do
   bash pipelines/07_call_dnascope_fastq.sh "${COV}"
 done
@@ -376,6 +382,7 @@ These runs use their own alignment pipeline from FASTQ, so keep them separate fr
 ### 6.1 Main Track
 
 ```bash
+# pwd: variant-calling-benchmark
 bash evaluation/eval_happy.sh
 ```
 
@@ -387,12 +394,14 @@ Outputs:
 `evaluation/gather_stats.sh` is the single collector and can also be called manually:
 
 ```bash
+# pwd: variant-calling-benchmark
 bash evaluation/gather_stats.sh results/eval results/eval/all_stats.tsv
 ```
 
 ## 7. Visualization
 
 ```bash
+# pwd: variant-calling-benchmark
 Rscript visualization/benchmark_plots.R results/eval/all_stats.tsv results/plots
 python visualization/plot_summary.py results/eval/all_stats.tsv results/plots
 ```
