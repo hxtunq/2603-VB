@@ -150,3 +150,32 @@ The optional `07_call_dnascope_fastq*.sh` scripts run the full DNAscope alignmen
 - Sentieon CLI docs: https://support.sentieon.com/docs/sentieon_cli/
 - Sentieon models: https://github.com/Sentieon/sentieon-models
 - Archived depth study: `archive/-Impact-of-Sequencing-Depth-on-Variant-Detection--main/`
+
+
+## Test
+
+```bash
+# Backup file gốc
+cp ${SIM_DIR}/${PREFIX}_truth.vcf.gz ${SIM_DIR}/${PREFIX}_truth.vcf.gz.bak
+
+# Giải nén
+gunzip ${SIM_DIR}/${PREFIX}_truth.vcf.gz
+
+TRUTH_VCF_RAW="${SIM_DIR}/${PREFIX}_truth.vcf"
+
+# Thêm sample column bằng cách:
+# 1. Thêm FORMAT và SAMPLE vào header
+# 2. Thêm GT=0/1 cho mỗi variant
+awk 'BEGIN{OFS="\t"} 
+/^##/{print; next} 
+/^#CHROM/{
+    print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">";
+    print $0, "FORMAT", "SIMULATED_SAMPLE"; 
+    next
+} 
+{print $0, "GT", "0/1"}' "${TRUTH_VCF_RAW}" > "${TRUTH_VCF_RAW}.tmp"
+
+mv "${TRUTH_VCF_RAW}.tmp" "${TRUTH_VCF_RAW}"
+bgzip "${TRUTH_VCF_RAW}"
+tabix -f -p vcf "${TRUTH_VCF_RAW}.gz"
+```
