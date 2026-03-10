@@ -10,7 +10,7 @@ export SENTIEON_BIN_DIR=$HOME/opt/sentieon/sentieon-genomics-202503.02/bin
 export PATH="${SENTIEON_BIN_DIR}:$PATH"
 
 # 3. Cấu hình license
-export SENTIEON_LICENSE=/path/to/sentieon.lic
+export SENTIEON_LICENSE=/path/to/Hanoi_University_Of_Science_And_Technology_eval.lic
 # hoặc:
 # export SENTIEON_LICENSE=license-server-host:port
 

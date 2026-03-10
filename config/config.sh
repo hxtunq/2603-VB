@@ -134,7 +134,7 @@ export HAPPY_IMAGE="jmcdani20/hap.py:v0.3.12"
 export SENTIEON_VERSION="${SENTIEON_VERSION:-202503.02}"
 
 # Auto-detect license and bin dir from .tools/sentieon/ if not set externally
-export SENTIEON_LICENSE="${SENTIEON_LICENSE:-${PROJECT_DIR}/.tools/sentieon/sentieon.lic}"
+export SENTIEON_LICENSE="${SENTIEON_LICENSE:-${PROJECT_DIR}/.tools/sentieon/Hanoi_University_Of_Science_And_Technology_eval.lic}"
 export SENTIEON_BIN_DIR="${SENTIEON_BIN_DIR:-${PROJECT_DIR}/.tools/sentieon/sentieon-genomics-${SENTIEON_VERSION}/bin}"
 
 if [[ -n "${SENTIEON_BIN_DIR}" ]]; then

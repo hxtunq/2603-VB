@@ -120,8 +120,8 @@ Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid lic
 
 # ---- 1. Download Sentieon license & software ----
 mkdir -p .tools/sentieon
-wget -O .tools/sentieon/sentieon.lic \
-  "http://www.sentieon.com/eula/a791eaf3ff8119a4e294f8fe3fa7f81a3a8ace87feaf0028523fb918e7d83812b2"
+# Copy license file vào .tools/sentieon/
+cp /path/to/Hanoi_University_Of_Science_And_Technology_eval.lic .tools/sentieon/
 
 wget -O .tools/sentieon/sentieon-genomics-202503.02.tar.gz \
   "https://s3.amazonaws.com/sentieon-release/software/sentieon-genomics-202503.02.tar.gz"
@@ -131,7 +131,7 @@ tar -xzf .tools/sentieon/sentieon-genomics-202503.02.tar.gz -C .tools/sentieon/
 pip install .tools/sentieon-cli-src/
 
 # ---- 3. Set environment variables ----
-export SENTIEON_LICENSE="$PWD/.tools/sentieon/sentieon.lic"
+export SENTIEON_LICENSE="$PWD/.tools/sentieon/Hanoi_University_Of_Science_And_Technology_eval.lic"
 export SENTIEON_BIN_DIR="$PWD/.tools/sentieon/sentieon-genomics-202503.02/bin"
 export PATH="${SENTIEON_BIN_DIR}:$PATH"
 
