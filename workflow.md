@@ -373,23 +373,6 @@ done
 
 These runs use their own alignment pipeline from FASTQ, so keep them separate from the main Track A ranking.
 
-### 5.3 Optional: Pangenome DNAscope
-
-Optional pangenome-based variant calling using the shared dedup BAM:
-
-```bash
-# pwd: variant-calling-benchmark
-for COV in 10 20 30 50; do
-  bash pipelines/08_call_pangenome.sh "${COV}"
-done
-
-for COV in 50 100 200; do
-  bash pipelines/08_call_pangenome_wes.sh "${COV}"
-done
-```
-
-These runs re-align reads through the pangenome graph internally, so even though the input is the shared BAM, the alignment path differs from other Track A callers.
-
 ## 6. Evaluation
 
 ### 6.1 Main Track

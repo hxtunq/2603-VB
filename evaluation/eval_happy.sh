@@ -8,8 +8,8 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 source "${SCRIPT_DIR}/../config/config.sh"
 source "${SCRIPT_DIR}/_happy_common.sh"
 
-WGS_CALLERS="gatk deepvariant strelka2 freebayes dnascope"
-WES_CALLERS="gatk_wes deepvariant_wes strelka2_wes freebayes_wes dnascope_wes"
+WGS_CALLERS="${WGS_CALLERS:-gatk deepvariant strelka2 freebayes dnascope}"
+WES_CALLERS="${WES_CALLERS:-gatk_wes deepvariant_wes strelka2_wes freebayes_wes dnascope_wes}"
 
 get_vcf() {
     local caller="$1"

@@ -160,10 +160,3 @@ sentieon_build_readgroup() {
     printf '@RG\tID:%s\tSM:%s\tPL:ILLUMINA\tLB:lib1\tPU:unit1' \
         "${rg_id}" "${SAMPLE_NAME}"
 }
-
-sentieon_require_pangenome_stack() {
-    sentieon_require_dnascope_cli_stack
-    for cmd in vg kmc bcftools samtools; do
-        sentieon_require_command "${cmd}"
-    done
-}
