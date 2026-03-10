@@ -1,7 +1,6 @@
 #!/bin/bash
-# Strelka2 Germline via Docker — WES Mode with Manta
+# Strelka2 Germline via Docker — WES mode (standalone, no Manta)
 # Same as 05_call_strelka.sh but with --exome flag and --callRegions
-# Manta also configured with --exome
 
 set -e
 
@@ -13,7 +12,7 @@ source "${PREPROC_DIR}/${COV}x_wes/bam_path.sh"
 CALLER="strelka2_wes"
 OUT_DIR="${VARIANT_DIR}/${COV}x_wes/${CALLER}"
 TIMEDIR="${LOG_DIR}/${COV}x_wes/time"
-mkdir -p "${OUT_DIR}"/{mantawd,strelkawd} "${TIMEDIR}"
+mkdir -p "${OUT_DIR}/strelkawd" "${TIMEDIR}"
 
 METRICS="${LOG_DIR}/${COV}x_wes/benchmark_metrics.tsv"
 if [[ ! -f "${METRICS}" ]]; then
@@ -46,7 +45,7 @@ BAM_BASENAME=$(basename "${FINAL_BAM}")
 REF_BASENAME=$(basename "${REF_FASTA}")
 FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_STRELKA_${COV}x_WES.vcf.gz"
 
-# Strelka2/Manta require bgzipped+tabixed BED for --callRegions
+# Strelka2 requires bgzipped+tabixed BED for --callRegions
 CALL_REGIONS_BED="${OUT_DIR}/exome_targets.bed.gz"
 if [[ ! -f "${CALL_REGIONS_BED}" ]]; then
     bgzip -c "${EXOME_BED}" > "${CALL_REGIONS_BED}"
@@ -55,50 +54,14 @@ fi
 CALL_REGIONS_BASENAME=$(basename "${CALL_REGIONS_BED}")
 
 # ==========================================================================
-# Step 1: Manta — WES mode with --exome
-# ==========================================================================
-echo "=== Running Manta (WES + exome mode) ==="
-/usr/bin/time -v -o "${TIMEDIR}/manta_wes.time" bash -c "
-    set -e
-    rm -rf '${ABS_OUT_DIR}/mantawd/workspace' '${ABS_OUT_DIR}/mantawd/results'
-
-    docker run --rm \
-        -v '${ABS_REF_DIR}:/ref:ro' \
-        -v '${ABS_PREPROC_DIR}:/input:ro' \
-        -v '${ABS_OUT_DIR}:/output' \
-        ${MANTA_IMAGE} \
-        configManta.py \
-        --bam '/input/${BAM_BASENAME}' \
-        --referenceFasta '/ref/${REF_BASENAME}' \
-        --exome \
-        --callRegions '/output/${CALL_REGIONS_BASENAME}' \
-        --runDir '/output/mantawd'
-
-    docker run --rm \
-        -v '${ABS_REF_DIR}:/ref:ro' \
-        -v '${ABS_PREPROC_DIR}:/input:ro' \
-        -v '${ABS_OUT_DIR}:/output' \
-        ${MANTA_IMAGE} \
-        /output/mantawd/runWorkflow.py -m local -j ${THREADS}
-"
-log_metrics "strelka2_wes" "Manta_WES" "${TIMEDIR}/manta_wes.time"
-
-CANDIDATE_INDELS="${OUT_DIR}/mantawd/results/variants/candidateSmallIndels.vcf.gz"
-if [[ ! -f "${CANDIDATE_INDELS}" ]]; then
-    echo "WARNING: Manta candidateSmallIndels not found"
-    INDEL_CANDIDATES_FLAG=""
-else
-    INDEL_CANDIDATES_FLAG="--indelCandidates '/output/mantawd/results/variants/candidateSmallIndels.vcf.gz'"
-fi
-
-# ==========================================================================
-# Step 2: Strelka2 — WES mode with --exome
+# Strelka2 — WES mode with --exome (standalone)
 # ==========================================================================
 echo "=== Running Strelka2 (WES + exome mode) ==="
 /usr/bin/time -v -o "${TIMEDIR}/strelka2_wes.time" bash -c "
     set -e
     rm -rf '${ABS_OUT_DIR}/strelkawd/workspace' '${ABS_OUT_DIR}/strelkawd/results'
 
+    # Configure Strelka2 with --exome and --callRegions
     docker run --rm \
         -v '${ABS_REF_DIR}:/ref:ro' \
         -v '${ABS_PREPROC_DIR}:/input:ro' \
@@ -109,9 +72,9 @@ echo "=== Running Strelka2 (WES + exome mode) ==="
         --referenceFasta '/ref/${REF_BASENAME}' \
         --exome \
         --callRegions '/output/${CALL_REGIONS_BASENAME}' \
-        ${INDEL_CANDIDATES_FLAG} \
         --runDir '/output/strelkawd'
 
+    # Run Strelka2
     docker run --rm \
         -v '${ABS_REF_DIR}:/ref:ro' \
         -v '${ABS_PREPROC_DIR}:/input:ro' \
@@ -121,10 +84,11 @@ echo "=== Running Strelka2 (WES + exome mode) ==="
 "
 log_metrics "strelka2_wes" "Strelka2_WES" "${TIMEDIR}/strelka2_wes.time"
 
+# --- Copy output ---
 cp "${OUT_DIR}/strelkawd/results/variants/variants.vcf.gz" \
    "${FINAL_VCF}"
 
 echo ""
-echo "Strelka2 WES done (with Manta, exome mode):"
+echo "Strelka2 WES done (standalone, no Manta):"
 echo "  Output: ${FINAL_VCF}"
 echo "Metrics: ${METRICS}"

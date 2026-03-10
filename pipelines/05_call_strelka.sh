@@ -1,8 +1,6 @@
 #!/bin/bash
-# Strelka2 Germline via Docker — with Manta candidate indels
+# Strelka2 Germline via Docker — WGS mode (standalone, no Manta)
 # Based on: caller_benchmark-main/pipelines/call_strelka.sh
-# Manta provides candidate indel sites to improve Strelka2 INDEL recall
-# Metrics: runtime + Max RSS for Manta+Strelka combined
 
 set -e
 
@@ -14,7 +12,7 @@ source "${PREPROC_DIR}/${COV}x/bam_path.sh"
 CALLER="strelka2"
 OUT_DIR="${VARIANT_DIR}/${COV}x/${CALLER}"
 TIMEDIR="${LOG_DIR}/${COV}x/time"
-mkdir -p "${OUT_DIR}"/{mantawd,strelkawd} "${TIMEDIR}"
+mkdir -p "${OUT_DIR}/strelkawd" "${TIMEDIR}"
 
 METRICS="${LOG_DIR}/${COV}x/benchmark_metrics.tsv"
 if [[ ! -f "${METRICS}" ]]; then
@@ -42,47 +40,7 @@ REF_BASENAME=$(basename "${REF_FASTA}")
 FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_STRELKA_${COV}x_WGS.vcf.gz"
 
 # ==========================================================================
-# Step 1: Manta — generate candidate indel sites
-# ==========================================================================
-echo "=== Running Manta for candidate indels ==="
-/usr/bin/time -v -o "${TIMEDIR}/manta.time" bash -c "
-    set -e
-    # Clean previous manta run if exists
-    rm -rf '${ABS_OUT_DIR}/mantawd/workspace' '${ABS_OUT_DIR}/mantawd/results'
-
-    # Configure Manta
-    docker run --rm \
-        -v '${ABS_REF_DIR}:/ref:ro' \
-        -v '${ABS_PREPROC_DIR}:/input:ro' \
-        -v '${ABS_OUT_DIR}:/output' \
-        ${MANTA_IMAGE} \
-        configManta.py \
-        --bam '/input/${BAM_BASENAME}' \
-        --referenceFasta '/ref/${REF_BASENAME}' \
-        --runDir '/output/mantawd'
-
-    # Run Manta
-    docker run --rm \
-        -v '${ABS_REF_DIR}:/ref:ro' \
-        -v '${ABS_PREPROC_DIR}:/input:ro' \
-        -v '${ABS_OUT_DIR}:/output' \
-        ${MANTA_IMAGE} \
-        /output/mantawd/runWorkflow.py -m local -j ${THREADS}
-"
-log_metrics "strelka2" "Manta" "${TIMEDIR}/manta.time"
-
-# Check for Manta candidate indels
-CANDIDATE_INDELS="${OUT_DIR}/mantawd/results/variants/candidateSmallIndels.vcf.gz"
-if [[ ! -f "${CANDIDATE_INDELS}" ]]; then
-    echo "WARNING: Manta candidateSmallIndels not found, running Strelka2 without it"
-    INDEL_CANDIDATES_FLAG=""
-else
-    echo "Manta candidate indels: ${CANDIDATE_INDELS}"
-    INDEL_CANDIDATES_FLAG="--indelCandidates '/output/mantawd/results/variants/candidateSmallIndels.vcf.gz'"
-fi
-
-# ==========================================================================
-# Step 2: Strelka2 — germline variant calling with Manta indel candidates
+# Strelka2 — germline variant calling (standalone)
 # ==========================================================================
 echo "=== Running Strelka2 (configure + run) ==="
 /usr/bin/time -v -o "${TIMEDIR}/strelka2.time" bash -c "
@@ -90,7 +48,7 @@ echo "=== Running Strelka2 (configure + run) ==="
     # Clean previous strelka run if exists
     rm -rf '${ABS_OUT_DIR}/strelkawd/workspace' '${ABS_OUT_DIR}/strelkawd/results'
 
-    # Configure Strelka2 with Manta candidate indels
+    # Configure Strelka2
     docker run --rm \
         -v '${ABS_REF_DIR}:/ref:ro' \
         -v '${ABS_PREPROC_DIR}:/input:ro' \
@@ -99,7 +57,6 @@ echo "=== Running Strelka2 (configure + run) ==="
         configureStrelkaGermlineWorkflow.py \
         --bam '/input/${BAM_BASENAME}' \
         --referenceFasta '/ref/${REF_BASENAME}' \
-        ${INDEL_CANDIDATES_FLAG} \
         --runDir '/output/strelkawd'
 
     # Run Strelka2
@@ -117,7 +74,6 @@ cp "${OUT_DIR}/strelkawd/results/variants/variants.vcf.gz" \
    "${FINAL_VCF}"
 
 echo ""
-echo "Strelka2 done (with Manta candidate indels):"
-echo "  Manta candidates: ${CANDIDATE_INDELS}"
-echo "  Strelka output:   ${FINAL_VCF}"
+echo "Strelka2 WGS done (standalone, no Manta):"
+echo "  Output: ${FINAL_VCF}"
 echo "Metrics: ${METRICS}"
