@@ -51,12 +51,12 @@ echo "=== Running DeepVariant ${DEEPVARIANT_VERSION} ==="
     --model_type=WGS \
     --ref="/ref/${REF_BASENAME}" \
     --reads="/input/${BAM_BASENAME}" \
-    --output_vcf="/output/${OUTPUT_PREFIX}.vcf" \
-    --output_gvcf="/output/${OUTPUT_PREFIX}.g.vcf" \
+    --output_vcf="/output/${OUTPUT_PREFIX}.vcf.gz" \
+    --output_gvcf="/output/${OUTPUT_PREFIX}.g.vcf.gz" \
     --num_shards=${THREADS}
 
 log_metrics "deepvariant" "DeepVariant" "${TIMEDIR}/deepvariant.time"
 
 echo ""
-echo "DV done: ${OUT_DIR}/${OUTPUT_PREFIX}.vcf"
+echo "DV done: ${OUT_DIR}/${OUTPUT_PREFIX}.vcf.gz"
 echo "Metrics: ${METRICS}"

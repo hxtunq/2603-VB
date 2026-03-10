@@ -32,7 +32,7 @@ log_metrics() {
     echo "  [METRICS] ${pipeline}: ${wall} wall, ${cpu}% CPU, MaxRSS=${rss} kB"
 }
 
-FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_FB_${COV}x_WGS.vcf"
+FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_FB_${COV}x_WGS.vcf.gz"
 
 # --- FreeBayes (measured) ---
 echo "=== Running FreeBayes ==="

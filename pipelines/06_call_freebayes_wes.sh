@@ -32,7 +32,7 @@ log_metrics() {
     echo "  [METRICS] ${pipeline}: ${wall} wall, ${cpu}% CPU, MaxRSS=${rss} kB"
 }
 
-FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_FB_${COV}x_WES.vcf"
+FINAL_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_FB_${COV}x_WES.vcf.gz"
 
 # Validate exome BED
 if [[ ! -f "${EXOME_BED}" ]]; then

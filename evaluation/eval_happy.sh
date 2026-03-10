@@ -18,15 +18,15 @@ get_vcf() {
     local mode="$4"
 
     case "${caller}" in
-        gatk)            printf '%s\n' "${variant_dir}/gatk/SS_${CHR_TO_USE}_HC_${cov}x_${mode}.vcf" ;;
-        deepvariant)     printf '%s\n' "${variant_dir}/deepvariant/SS_${CHR_TO_USE}_DV_${cov}x_${mode}.vcf" ;;
+        gatk)            printf '%s\n' "${variant_dir}/gatk/SS_${CHR_TO_USE}_HC_${cov}x_${mode}.vcf.gz" ;;
+        deepvariant)     printf '%s\n' "${variant_dir}/deepvariant/SS_${CHR_TO_USE}_DV_${cov}x_${mode}.vcf.gz" ;;
         strelka2)        printf '%s\n' "${variant_dir}/strelka2/SS_${CHR_TO_USE}_STRELKA_${cov}x_${mode}.vcf.gz" ;;
-        freebayes)       printf '%s\n' "${variant_dir}/freebayes/SS_${CHR_TO_USE}_FB_${cov}x_${mode}.vcf" ;;
+        freebayes)       printf '%s\n' "${variant_dir}/freebayes/SS_${CHR_TO_USE}_FB_${cov}x_${mode}.vcf.gz" ;;
         dnascope)        printf '%s\n' "${variant_dir}/dnascope/SS_${CHR_TO_USE}_DNASCOPE_${cov}x_${mode}.vcf.gz" ;;
-        gatk_wes)        printf '%s\n' "${variant_dir}/gatk_wes/SS_${CHR_TO_USE}_HC_${cov}x_${mode}.vcf" ;;
-        deepvariant_wes) printf '%s\n' "${variant_dir}/deepvariant_wes/SS_${CHR_TO_USE}_DV_${cov}x_${mode}.vcf" ;;
+        gatk_wes)        printf '%s\n' "${variant_dir}/gatk_wes/SS_${CHR_TO_USE}_HC_${cov}x_${mode}.vcf.gz" ;;
+        deepvariant_wes) printf '%s\n' "${variant_dir}/deepvariant_wes/SS_${CHR_TO_USE}_DV_${cov}x_${mode}.vcf.gz" ;;
         strelka2_wes)    printf '%s\n' "${variant_dir}/strelka2_wes/SS_${CHR_TO_USE}_STRELKA_${cov}x_${mode}.vcf.gz" ;;
-        freebayes_wes)   printf '%s\n' "${variant_dir}/freebayes_wes/SS_${CHR_TO_USE}_FB_${cov}x_${mode}.vcf" ;;
+        freebayes_wes)   printf '%s\n' "${variant_dir}/freebayes_wes/SS_${CHR_TO_USE}_FB_${cov}x_${mode}.vcf.gz" ;;
         dnascope_wes)    printf '%s\n' "${variant_dir}/dnascope_wes/SS_${CHR_TO_USE}_DNASCOPE_${cov}x_${mode}.vcf.gz" ;;
         *)               return 1 ;;
     esac
