@@ -158,6 +158,17 @@ export DNASCOPE_WES_MODEL="${DNASCOPE_WES_MODEL:-${REF_DIR}/models/DNAscopeIllum
 # PCR-free library prep (affects DNAscope indel model)
 export PCRFREE="${PCRFREE:-true}"
 
+# === Sentieon Pangenome References ===
+# Download pangenome graph files from HPRC:
+#   https://github.com/human-pangenomics/hpp_pangenome_resources
+# Download pangenome model bundle + population VCF from Sentieon:
+#   https://github.com/Sentieon/sentieon-models
+# The pangenome pipeline also requires: vg, kmc, bcftools, samtools in PATH.
+export PANGENOME_GBZ="${PANGENOME_GBZ:-${REF_DIR}/pangenome/hprc-v1.1-mc-grch38.gbz}"
+export PANGENOME_HAPL="${PANGENOME_HAPL:-${REF_DIR}/pangenome/hprc-v1.1-mc-grch38.hapl}"
+export PANGENOME_POP_VCF="${PANGENOME_POP_VCF:-${REF_DIR}/pangenome/population.vcf.gz}"
+export DNASCOPE_PANGENOME_MODEL="${DNASCOPE_PANGENOME_MODEL:-${REF_DIR}/models/SentieonPangenome1.0.bundle}"
+
 #-------------------------------------------------------------------------------
 # BENCHMARKING
 #-------------------------------------------------------------------------------

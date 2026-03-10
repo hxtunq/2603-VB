@@ -152,6 +152,40 @@ export DNASCOPE_WES_MODEL="$PWD/data/reference/models/DNAscopeIlluminaWES2.1.bun
 
 > **Note:** The trial license (up to 128 threads) is valid until **April 15th, 2026**.
 
+### 2.5 Pangenome Assets
+
+The pangenome pipeline (`sentieon-cli sentieon-pangenome`) requires additional graph-based reference files and a pangenome-specific model bundle. These are separate from the standard DNAscope assets.
+
+```bash
+# pwd: variant-calling-benchmark
+
+# ---- 1. Pangenome graph files (HPRC Minigraph-Cactus, GRCh38) ----
+mkdir -p data/reference/pangenome
+
+# GBZ graph
+wget -O data/reference/pangenome/hprc-v1.1-mc-grch38.gbz \
+  "https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38.gbz"
+
+# Haplotype file
+wget -O data/reference/pangenome/hprc-v1.1-mc-grch38.hapl \
+  "https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38.hapl"
+
+# ---- 2. Pangenome model bundle + population VCF ----
+# Check https://github.com/Sentieon/sentieon-models for the latest files
+wget -O data/reference/models/SentieonPangenome1.0.bundle \
+  "https://s3.amazonaws.com/sentieon-release/other/SentieonPangenome1.0.bundle"
+
+wget -O data/reference/pangenome/population.vcf.gz \
+  "<URL_FROM_SENTIEON_MODELS_REPO>"
+tabix -p vcf data/reference/pangenome/population.vcf.gz
+
+# ---- 3. Required tools (must be in PATH) ----
+# vg, kmc, bcftools, samtools
+# Install via conda: conda install -c bioconda vg kmc bcftools samtools
+```
+
+> **Note:** The full HPRC pangenome covers the entire GRCh38 genome. Since this project uses only chr22, add `--skip_pangenome_name_checks` (already included in the scripts). Verify the population VCF URL from [Sentieon models](https://github.com/Sentieon/sentieon-models) before downloading.
+
 ## 3. Truth Set And Simulated FASTQs
 
 ### 3.1 Truth VCF From simuG
@@ -372,6 +406,23 @@ done
 ```
 
 These runs use their own alignment pipeline from FASTQ, so keep them separate from the main Track A ranking.
+
+### 5.3 Optional: Pangenome DNAscope
+
+Optional pangenome-based variant calling using the shared dedup BAM:
+
+```bash
+# pwd: variant-calling-benchmark
+for COV in 10 20 30 50; do
+  bash pipelines/08_call_pangenome.sh "${COV}"
+done
+
+for COV in 50 100 200; do
+  bash pipelines/08_call_pangenome_wes.sh "${COV}"
+done
+```
+
+These runs re-align reads through the pangenome graph internally, so even though the input is the shared BAM, the alignment path differs from other Track A callers.
 
 ## 6. Evaluation
 
