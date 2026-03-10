@@ -82,8 +82,6 @@ happy_make_comparison() {
         --threads "${THREADS}" \
         --engine vcfeval \
         --engine-vcfeval-template "/ref/$(basename "${RTG_SDF}")" \
-        --preprocess-truth \
-        --no-fixchr \
         -o "/output/report"
 
     echo "  Output: ${eval_out}/report.*"

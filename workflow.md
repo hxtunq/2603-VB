@@ -184,6 +184,13 @@ bcftools sort -Oz -o simulated/SIMULATED_SAMPLE_chr22_truth.vcf.gz
 tabix -p vcf simulated/SIMULATED_SAMPLE_chr22_truth.vcf.gz
 ```
 
+simuG produces sites-only VCFs (no FORMAT/SAMPLE columns). Because the simulation is haploid (ART reads come from one mutated genome copy), all callers will report GT=1/1. Run the fix script to add the sample column:
+
+```bash
+# pwd: variant-calling-benchmark
+bash evaluation/fix_truth_vcf.sh
+```
+
 ### 3.2 WGS FASTQs
 
 ```bash
