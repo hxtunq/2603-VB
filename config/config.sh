@@ -132,7 +132,10 @@ export HAPPY_IMAGE="jmcdani20/hap.py:v0.3.12"
 
 # Sentieon DNAscope (optional — requires SENTIEON_LICENSE)
 export SENTIEON_VERSION="${SENTIEON_VERSION:-202503.02}"
-export SENTIEON_BIN_DIR="${SENTIEON_BIN_DIR:-}"
+
+# Auto-detect license and bin dir from .tools/sentieon/ if not set externally
+export SENTIEON_LICENSE="${SENTIEON_LICENSE:-${PROJECT_DIR}/.tools/sentieon/sentieon.lic}"
+export SENTIEON_BIN_DIR="${SENTIEON_BIN_DIR:-${PROJECT_DIR}/.tools/sentieon/sentieon-genomics-${SENTIEON_VERSION}/bin}"
 
 if [[ -n "${SENTIEON_BIN_DIR}" ]]; then
     case ":${PATH}:" in
@@ -147,10 +150,10 @@ fi
 # sentieon-cli dnascope expects -m/--model_bundle to be the .bundle archive file.
 # Do not point these variables at unpacked directories.
 # Override DNASCOPE_WGS_MODEL / DNASCOPE_WES_MODEL if you download newer bundles.
-# WGS: DNAscopeIlluminaWGS2.0.bundle
-# WES: DNAscopeIlluminaWES2.0.bundle
-export DNASCOPE_WGS_MODEL="${DNASCOPE_WGS_MODEL:-${REF_DIR}/models/DNAscopeIlluminaWGS2.0.bundle}"
-export DNASCOPE_WES_MODEL="${DNASCOPE_WES_MODEL:-${REF_DIR}/models/DNAscopeIlluminaWES2.0.bundle}"
+# WGS: SentieonIlluminaWGS2.2.bundle
+# WES: DNAscopeIlluminaWES2.1.bundle
+export DNASCOPE_WGS_MODEL="${DNASCOPE_WGS_MODEL:-${REF_DIR}/models/SentieonIlluminaWGS2.2.bundle}"
+export DNASCOPE_WES_MODEL="${DNASCOPE_WES_MODEL:-${REF_DIR}/models/DNAscopeIlluminaWES2.1.bundle}"
 
 # PCR-free library prep (affects DNAscope indel model)
 export PCRFREE="${PCRFREE:-true}"

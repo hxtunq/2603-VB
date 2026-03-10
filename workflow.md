@@ -117,24 +117,30 @@ Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid lic
 
 ```bash
 # pwd: variant-calling-benchmark
-export SENTIEON_LICENSE=/absolute/path/to/sentieon.lic
-# Or: export SENTIEON_LICENSE=license-server-host:port
-export SENTIEON_BIN_DIR=/absolute/path/to/sentieon-genomics-202503.02/bin
+
+# ---- 1. Download Sentieon license & software ----
+mkdir -p .tools/sentieon
+wget -O .tools/sentieon/sentieon.lic \
+  "http://www.sentieon.com/eula/a791eaf3ff8119a4e294f8fe3fa7f81a3a8ace87feaf0028523fb918e7d83812b2"
+
+wget -O .tools/sentieon/sentieon-genomics-202503.02.tar.gz \
+  "https://s3.amazonaws.com/sentieon-release/software/sentieon-genomics-202503.02.tar.gz"
+tar -xzf .tools/sentieon/sentieon-genomics-202503.02.tar.gz -C .tools/sentieon/
+
+# ---- 2. Install sentieon-cli (from local source) ----
+pip install .tools/sentieon-cli-src/
+
+# ---- 3. Set environment variables ----
+export SENTIEON_LICENSE="$PWD/.tools/sentieon/sentieon.lic"
+export SENTIEON_BIN_DIR="$PWD/.tools/sentieon/sentieon-genomics-202503.02/bin"
 export PATH="${SENTIEON_BIN_DIR}:$PATH"
 
+# Verify both commands are reachable
 command -v sentieon-cli
 command -v sentieon
 
+# ---- 4. Download DNAscope model bundles ----
 mkdir -p data/reference/models
-
-# Sentieon model bundles are published here:
-#   https://github.com/Sentieon/sentieon-models
-#
-# Example Illumina bundle names listed there on 2026-03-06:
-#   - WGS: SentieonIlluminaWGS2.2.bundle
-#   - WES: DNAscopeIlluminaWES2.1.bundle
-#
-# Point DNASCOPE_WGS_MODEL / DNASCOPE_WES_MODEL at these .bundle archives directly.
 wget -O data/reference/models/SentieonIlluminaWGS2.2.bundle \
   https://s3.amazonaws.com/sentieon-release/other/SentieonIlluminaWGS2.2.bundle
 wget -O data/reference/models/DNAscopeIlluminaWES2.1.bundle \
@@ -142,10 +148,9 @@ wget -O data/reference/models/DNAscopeIlluminaWES2.1.bundle \
 
 export DNASCOPE_WGS_MODEL="$PWD/data/reference/models/SentieonIlluminaWGS2.2.bundle"
 export DNASCOPE_WES_MODEL="$PWD/data/reference/models/DNAscopeIlluminaWES2.1.bundle"
-
-# If you already have the older 2.0 bundles used in config/config.sh defaults,
-# point the variables at those .bundle files instead and skip the overrides above.
 ```
+
+> **Note:** The trial license (up to 128 threads) is valid until **April 15th, 2026**.
 
 ## 3. Truth Set And Simulated FASTQs
 
