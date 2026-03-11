@@ -230,13 +230,24 @@ PREFIX="SIMULATED_SAMPLE_chr22"
 MUTATED_FASTA="${SIM_DIR}/${PREFIX}.simseq.genome.fa"
 EXOME_BED="reference/Exome-Agilent_V6.chr22.bed"
 
+# --- Pad exome targets before extracting FASTA for read simulation ---
+# Most exons are 100–200 bp, shorter than ART's fragment size (-m 350).
+# Without padding, art_illumina drops short sequences entirely (→ massive FN)
+# and creates artificial edge-alignment artifacts (→ spurious FP).
+# Adding 400 bp flanks ensures every target generates proper paired-end reads.
+# Variant callers and hap.py still use the strict, unpadded EXOME_BED.
 samtools faidx "${MUTATED_FASTA}"
-bedtools getfasta -fi "${MUTATED_FASTA}" -bed "${EXOME_BED}" -fo "${SIM_DIR}/${PREFIX}_exome.fa"
+bedtools slop -i "${EXOME_BED}" -g reference/chr22.fa.fai -b 400 \
+  | bedtools merge > "reference/Exome_padded400.chr22.bed"
+
+bedtools getfasta -fi "${MUTATED_FASTA}" \
+  -bed "reference/Exome_padded400.chr22.bed" \
+  -fo "${SIM_DIR}/${PREFIX}_exome_padded.fa"
 
 for COV in 50 100 200; do
   art_illumina \
     -ss HS25 \
-    -i "${SIM_DIR}/${PREFIX}_exome.fa" \
+    -i "${SIM_DIR}/${PREFIX}_exome_padded.fa" \
     -p \
     -l 150 \
     -f "${COV}" \
