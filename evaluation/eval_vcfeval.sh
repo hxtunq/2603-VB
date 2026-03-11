@@ -47,33 +47,45 @@ caller_alias() {
     esac
 }
 
-# ---------- Prepare truth VCF with GT column ----------
+# ---------- Prepare truth VCF for vcfeval ----------
 prepare_truth() {
     local truth_prepared="${EVAL_DIR}/vcfeval/truth_prepared.vcf.gz"
+    local truth_tmp="${truth_prepared}.tmp"
+    local sample_count=0
 
-    if [[ -f "${truth_prepared}" ]]; then
+    if [[ -s "${truth_prepared}" && -s "${truth_prepared}.tbi" ]]; then
         echo "[TRUTH] Already prepared: ${truth_prepared}"
         return
     fi
 
     mkdir -p "$(dirname "${truth_prepared}")"
-    echo "[TRUTH] Preparing truth VCF with GT column..."
+    rm -f "${truth_tmp}" "${truth_tmp}.tbi"
 
-    # simuG produces sites-only VCFs; add ##FORMAT=GT header + GT:1/1
-    zcat "${TRUTH_VCF}" | awk 'BEGIN{OFS="\t"; ff=0}
-      /^##fileformat=/ {ff=1; print; next}
-      /^##/ {print; next}
-      /^#CHROM/ {
-        if(ff==0) print "##fileformat=VCFv4.2"
-        print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">"
-        print $0,"FORMAT","TRUTH"
-        next
-      }
-      {print $0,"GT","1/1"}
-    ' | bcftools norm -f "${REF_FASTA}" -m -both \
-      | bgzip -c > "${truth_prepared}"
+    sample_count=$(bcftools query -l "${TRUTH_VCF}" | awk 'NF {c++} END {print c+0}')
 
-    tabix -f -p vcf "${truth_prepared}"
+    if (( sample_count > 0 )); then
+        echo "[TRUTH] Input truth VCF already has ${sample_count} sample(s); preserving existing FORMAT/sample columns."
+        bcftools norm -f "${REF_FASTA}" -m -both "${TRUTH_VCF}" \
+            | bgzip -c > "${truth_tmp}"
+    else
+        echo "[TRUTH] Input truth VCF is sites-only; adding GT=1/1 sample column."
+        zcat "${TRUTH_VCF}" | awk 'BEGIN{OFS="\t"; ff=0}
+          /^##fileformat=/ {ff=1; print; next}
+          /^##/ {print; next}
+          /^#CHROM/ {
+            if(ff==0) print "##fileformat=VCFv4.2"
+            print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">"
+            print $0,"FORMAT","TRUTH"
+            next
+          }
+          {print $0,"GT","1/1"}
+        ' | bcftools norm -f "${REF_FASTA}" -m -both \
+          | bgzip -c > "${truth_tmp}"
+    fi
+
+    tabix -f -p vcf "${truth_tmp}"
+    mv -f "${truth_tmp}" "${truth_prepared}"
+    mv -f "${truth_tmp}.tbi" "${truth_prepared}.tbi"
     echo "[TRUTH] Done: ${truth_prepared}"
 }
 
