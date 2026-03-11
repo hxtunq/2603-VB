@@ -104,6 +104,20 @@ EOF
 rtg format -o chr22.sdf chr22.fa
 ```
 
+### 2.5 GC Content Stratification BEDs
+
+```bash
+# pwd: variant-calling-benchmark
+
+python evaluation/generate_gc_strata.py \
+    data/reference/chr22.fa \
+    data/reference/gc_strata \
+    1000
+```
+
+This generates 7 BED files (GC_0_20, GC_20_30, ..., GC_80_100) in `data/reference/gc_strata/` and updates `stratification_chr22.tsv` with the new GC bins. The stratification is used by hap.py to report per-GC-bin accuracy.
+```
+
 `chr22.sdf` is required before running hap.py with `--engine vcfeval`.
 
 ### 2.4 Sentieon Assets
@@ -314,6 +328,27 @@ Outputs:
 bash evaluation/gather_stats.sh results/eval results/eval/all_stats.tsv
 ```
 
+### 6.2 Concordance Analysis
+
+Pairwise comparison between callers using RTG vcfeval:
+
+```bash
+# pwd: variant-calling-benchmark
+
+# Step 1: Run pairwise RTG vcfeval for all caller pairs
+bash evaluation/concordance/run_concordance.sh
+
+# Step 2: Build concordance matrix from results
+python evaluation/concordance/concordance_matrix.py \
+    results/eval/concordance \
+    results/eval/concordance/concordance_matrix.tsv
+
+# Step 3: Generate heatmap visualizations
+python visualization/plot_concordance.py \
+    results/eval/concordance/concordance_matrix.tsv \
+    results/plots
+```
+
 ## 7. Visualization
 
 ```bash
@@ -322,7 +357,15 @@ Rscript visualization/benchmark_plots.R results/eval/all_stats.tsv results/plots
 python visualization/plot_summary.py results/eval/all_stats.tsv results/plots
 ```
 
-Both plotting scripts now create separate output sets per coverage level.
+Both plotting scripts create separate output sets per coverage level plus cross-coverage comparison plots:
+
+- **Per-coverage:** F1 bar charts, Precision-Recall scatter, TP/FP/FN counts
+- **Cross-coverage (new):**
+  - `grouped_bars_{snp,indel}_*.png` — F1/Recall/Precision grouped by coverage
+  - `f1_heatmap_*.png` — Callers × Coverage heatmap
+  - `snp_vs_indel_*.png` — Side-by-side SNP vs INDEL F1
+  - `variant_breakdown_*.png` — TP/FP/FN per variant type across coverages
+  - `variant_breakdown_*.tsv` — Summary table with variant type breakdown
 
 ## 8. Method Notes
 

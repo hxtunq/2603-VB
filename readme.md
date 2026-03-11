@@ -46,7 +46,11 @@ variant-calling-benchmark/
 │   ├── _happy_common.sh
 │   ├── eval_happy.sh
 │   ├── fix_truth_vcf.sh
-│   └── gather_stats.sh
+│   ├── gather_stats.sh
+│   ├── generate_gc_strata.py        # GC-content stratification BEDs
+│   └── concordance/
+│       ├── run_concordance.sh        # Pairwise RTG vcfeval
+│       └── concordance_matrix.py     # Build concordance matrix
 ├── pipelines/
 │   ├── _sentieon_common.sh
 │   ├── 03_call_hc.sh
@@ -57,7 +61,8 @@ variant-calling-benchmark/
 │   └── 07_call_dnascope_fastq.sh
 ├── visualization/
 │   ├── benchmark_plots.R
-│   └── plot_summary.py
+│   ├── plot_summary.py               # Per-coverage + cross-coverage plots
+│   └── plot_concordance.py           # Concordance heatmaps
 ├── workflow.md
 └── archive/
 ```
@@ -104,6 +109,15 @@ Primary benchmark:
 - Variant calls: `results/variants/{coverage}/...`
 - Evaluation: `results/eval/...`
 - Aggregated stats: `results/eval/all_stats.tsv`
+- Concordance matrix: `results/eval/concordance/concordance_matrix.tsv`
+- Variant breakdown (SNP/INDEL): `results/plots/variant_breakdown_*.tsv`
+
+Visualization outputs:
+
+- F1 heatmap (callers × coverage): `results/plots/f1_heatmap_*.png`
+- Grouped bar charts: `results/plots/grouped_bars_*.png`
+- SNP vs INDEL comparison: `results/plots/snp_vs_indel_*.png`
+- Concordance heatmaps: `results/plots/concordance_heatmap_*.png`
 
 Benchmark runtime / CPU / RSS are appended per coverage to:
 
