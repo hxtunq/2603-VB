@@ -71,20 +71,13 @@ grep -w "chr22" CDS-canonical.bed > CDS-canonical.chr22.bed
 rm CDS-canonical.bed
 
 
-wget -O umap_k100_mappability.bed.gz \
-  https://github.com/AstraZeneca-NGS/reference_data/raw/master/hg38/tricky_regions/umap_k100_mappability.bed.gz
-wget -O umap_k100_mappability.bed.gz.tbi \
-  https://github.com/AstraZeneca-NGS/reference_data/raw/master/hg38/tricky_regions/umap_k100_mappability.bed.gz.tbi
-tabix umap_k100_mappability.bed.gz chr22 | bgzip > umap_k100_mappability.chr22.bed.gz
-tabix -p bed umap_k100_mappability.chr22.bed.gz
-
 # phải dùng đến env biopython: conda activate biopython
 
 python3 - <<'PY'
 from Bio import SeqIO
 import re
 
-with open("chr22_highconf_tmp.bed", "w") as out:
+with open("chr22_highconf.bed", "w") as out:
     for record in SeqIO.parse("chr22.fa", "fasta"):
         for match in re.finditer(r"[ACGT]+", str(record.seq).upper()):
             if match.end() - match.start() >= 1000:
@@ -93,14 +86,8 @@ PY
 
 # quay về env ban đầu
 
-# UMAP k=100 stores uniquely mappable regions, so keep those in the callable/high-confidence BED.
-bedtools intersect -a chr22_highconf_tmp.bed -b umap_k100_mappability.chr22.bed.gz > chr22_highconf.bed
-bedtools subtract -a chr22_highconf_tmp.bed -b umap_k100_mappability.chr22.bed.gz > chr22_low_mappability.bed
-rm chr22_highconf_tmp.bed
-
 cat > stratification_chr22.tsv <<'EOF'
 CDS	CDS-canonical.chr22.bed
-Low_Mappability	chr22_low_mappability.bed
 EOF
 
 rtg format -o chr22.sdf chr22.fa

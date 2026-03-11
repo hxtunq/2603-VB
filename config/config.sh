@@ -96,10 +96,7 @@ export READ_GROUP="@RG\\tID:${SAMPLE_NAME}\\tSM:${SAMPLE_NAME}\\tPL:ILLUMINA\\tL
 #-------------------------------------------------------------------------------
 # BED FILES — Confidence region + stratification
 #-------------------------------------------------------------------------------
-# UMAP k=100 uniquely mappable regions for chr22
-export MAPPABILITY_BED="${REF_DIR}/umap_k100_mappability.chr22.bed.gz"
-
-# High-confidence region = non-N reference bases intersected with uniquely mappable regions
+# High-confidence region = non-N reference intervals at least 1000 bp long
 export TRUTH_BED="${REF_DIR}/${CHR_TO_USE}_highconf.bed"
 
 # Stratification TSV for hap.py (list of BED files)
