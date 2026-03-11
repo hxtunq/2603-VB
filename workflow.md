@@ -105,6 +105,17 @@ python evaluation/generate_gc_strata.py \
 ```
 
 This generates 7 BED files (GC_0_20, GC_20_30, ..., GC_80_100) in `data/reference/gc_strata/` and updates `stratification_chr22.tsv` with the new GC bins. The stratification is used by hap.py to report per-GC-bin accuracy.
+
+### 2.6 Advanced Stratification and ClinVar BEDs
+
+```bash
+# pwd: variant-calling-benchmark
+
+# Prepare GENCODE CDS, GC, and Coverage stratification BEDs
+bash evaluation/prepare_stratification_hg38.sh
+
+# Download and filter ClinVar to chr22 pathogenic variants
+bash evaluation/prepare_clinvar.sh
 ```
 
 `chr22.sdf` is required before running hap.py with `--engine vcfeval`.
@@ -333,7 +344,10 @@ python evaluation/concordance/concordance_matrix.py \
     results/eval/concordance \
     results/eval/concordance/concordance_matrix.tsv
 
-# Step 3: Generate heatmap visualizations
+# Step 3: Extract variant-level concordance for PCA and UpSet plots
+bash evaluation/build_variant_table.sh
+
+# Step 4: Generate heatmap visualizations
 python visualization/plot_concordance.py \
     results/eval/concordance/concordance_matrix.tsv \
     results/plots
@@ -372,6 +386,29 @@ Generates:
 - `coverage_radar.png` — Radar chart per coverage
 - `coverage_fn_fp_area.png` — Stacked FN+FP area chart
 - `coverage_f1_heatmap.png` — F1 callers × coverage heatmap
+
+### 7.3 Advanced Analysis (Pairwise, PCA, Stratified, ClinVar)
+
+These R scripts adapt the analysis pipeline from the reference paper:
+
+```bash
+# pwd: variant-calling-benchmark
+
+# 1. Pairwise Wilcoxon Signed-Rank Test Heatmaps
+Rscript visualization/01_pairwise_wilcoxon.R
+
+# 2. PCA Scatterplot of Discordant Variants
+Rscript visualization/02_pca_scatterplot.R
+
+# 3. Stratified Performance Line Plots (reads hap.py output)
+Rscript visualization/03_stratified_plots.R
+
+# 4. ClinVar Pathogenic Variant Detection Analysis
+Rscript visualization/04_clinvar_analysis.R
+
+# 5. UpSet Plots (render RMarkdown)
+Rscript -e "rmarkdown::render('visualization/upset-plot.Rmd')"
+```
 
 ## 8. AlphaGenome Scoring
 

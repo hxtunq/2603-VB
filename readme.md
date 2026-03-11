@@ -19,10 +19,11 @@ Implemented benchmark components:
 - Optional end-to-end DNAscope from raw FASTQ
 - Truth-based evaluation with hap.py + RTG vcfeval
 - Summary plots from `results/eval/all_stats.tsv`
+- Advanced analysis: Pairwise Wilcoxon heatmaps, PCA, Stratified performance (CDS/GC/Coverage), UpSet plots, ClinVar pathogenic detection
 
 Not implemented in this repo:
 
-- SnpEff / dbNSFP / ClinVar annotation pipeline
+- SnpEff / dbNSFP annotation pipeline
 - AlphaGenome functional-risk scoring
 
 Those items are future work only, not runnable workflow steps.
@@ -94,10 +95,10 @@ for COV in 10 20 30 50; do
   bash pipelines/07_call_dnascope_fastq.sh "${COV}"
 done
 
-# Evaluation
+# Evaluation (refer to workflow.md for concordance and stratification)
 bash evaluation/eval_happy.sh
 
-# Visualization
+# Visualization (refer to workflow.md for advanced analysis scripts)
 Rscript visualization/benchmark_plots.R results/eval/all_stats.tsv results/plots
 python visualization/plot_summary.py results/eval/all_stats.tsv results/plots
 ```
