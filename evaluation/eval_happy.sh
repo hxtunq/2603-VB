@@ -9,7 +9,6 @@ source "${SCRIPT_DIR}/../config/config.sh"
 source "${SCRIPT_DIR}/_happy_common.sh"
 
 WGS_CALLERS="${WGS_CALLERS:-gatk deepvariant strelka2 freebayes dnascope}"
-WES_CALLERS="${WES_CALLERS:-gatk_wes deepvariant_wes strelka2_wes freebayes_wes dnascope_wes}"
 
 get_vcf() {
     local caller="$1"
@@ -23,11 +22,6 @@ get_vcf() {
         strelka2)        printf '%s\n' "${variant_dir}/strelka2/SS_${CHR_TO_USE}_STRELKA_${cov}x_${mode}.vcf.gz" ;;
         freebayes)       printf '%s\n' "${variant_dir}/freebayes/SS_${CHR_TO_USE}_FB_${cov}x_${mode}.vcf.gz" ;;
         dnascope)        printf '%s\n' "${variant_dir}/dnascope/SS_${CHR_TO_USE}_DNASCOPE_${cov}x_${mode}.vcf.gz" ;;
-        gatk_wes)        printf '%s\n' "${variant_dir}/gatk_wes/SS_${CHR_TO_USE}_HC_${cov}x_${mode}.vcf.gz" ;;
-        deepvariant_wes) printf '%s\n' "${variant_dir}/deepvariant_wes/SS_${CHR_TO_USE}_DV_${cov}x_${mode}.vcf.gz" ;;
-        strelka2_wes)    printf '%s\n' "${variant_dir}/strelka2_wes/SS_${CHR_TO_USE}_STRELKA_${cov}x_${mode}.vcf.gz" ;;
-        freebayes_wes)   printf '%s\n' "${variant_dir}/freebayes_wes/SS_${CHR_TO_USE}_FB_${cov}x_${mode}.vcf.gz" ;;
-        dnascope_wes)    printf '%s\n' "${variant_dir}/dnascope_wes/SS_${CHR_TO_USE}_DNASCOPE_${cov}x_${mode}.vcf.gz" ;;
         *)               return 1 ;;
     esac
 }
@@ -52,19 +46,6 @@ for COV in "${COVERAGES_WGS[@]}"; do
             happy_make_comparison "${VCF}" "${caller}" "${COV}" "WGS" "${EVAL_DIR}"
         else
             echo "SKIP: ${caller} @ ${COV}x WGS - VCF not found: ${VCF}"
-        fi
-    done
-done
-
-for COV in "${COVERAGES_WES[@]}"; do
-    VARIANT_DIR_COV="${VARIANT_DIR}/${COV}x_wes"
-
-    for caller in ${WES_CALLERS}; do
-        VCF=$(get_vcf "${caller}" "${VARIANT_DIR_COV}" "${COV}" "WES")
-        if [[ -f "${VCF}" ]] || [[ -f "${VCF}.gz" ]]; then
-            happy_make_comparison "${VCF}" "${caller}" "${COV}" "WES" "${EVAL_DIR}"
-        else
-            echo "SKIP: ${caller} @ ${COV}x WES - VCF not found: ${VCF}"
         fi
     done
 done

@@ -70,10 +70,6 @@ wget -O CDS-canonical.bed \
 grep -w "chr22" CDS-canonical.bed > CDS-canonical.chr22.bed
 rm CDS-canonical.bed
 
-wget -O Exome-Agilent_V6.bed \
-  https://raw.githubusercontent.com/AstraZeneca-NGS/reference_data/master/hg38/bed/Exome-Agilent_V6.bed
-grep -w "chr22" Exome-Agilent_V6.bed > Exome-Agilent_V6.chr22.bed
-rm Exome-Agilent_V6.bed
 
 wget -O umap_k100_mappability.bed.gz \
   https://github.com/AstraZeneca-NGS/reference_data/raw/master/hg38/tricky_regions/umap_k100_mappability.bed.gz
@@ -102,7 +98,6 @@ rm chr22_highconf_tmp.bed
 
 cat > stratification_chr22.tsv <<'EOF'
 CDS	CDS-canonical.chr22.bed
-Exome_Targets	Exome-Agilent_V6.chr22.bed
 Low_Mappability	umap_k100_mappability.chr22.bed.gz
 EOF
 
@@ -113,7 +108,7 @@ rtg format -o chr22.sdf chr22.fa
 
 ### 2.4 Sentieon Assets
 
-Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid license. The `07_call_dnascope*.sh` and `07_call_dnascope_fastq*.sh` scripts invoke the local `sentieon-cli` command directly, and `sentieon-cli dnascope` shells out to `sentieon driver`, so both `sentieon-cli` and `sentieon` must be available in `PATH`. For `sentieon-cli dnascope`, `DNASCOPE_WGS_MODEL` and `DNASCOPE_WES_MODEL` must point to the downloaded `.bundle` files, not unpacked directories.
+Shared-BAM DNAscope and the optional raw-FASTQ DNAscope runs require a valid license. The `07_call_dnascope*.sh` and `07_call_dnascope_fastq*.sh` scripts invoke the local `sentieon-cli` command directly, and `sentieon-cli dnascope` shells out to `sentieon driver`, so both `sentieon-cli` and `sentieon` must be available in `PATH`. For `sentieon-cli dnascope`, `DNASCOPE_WGS_MODEL` must point to the downloaded `.bundle` file, not an unpacked directory.
 
 ```bash
 # pwd: variant-calling-benchmark
@@ -143,11 +138,8 @@ command -v sentieon
 mkdir -p data/reference/models
 wget -O data/reference/models/SentieonIlluminaWGS2.2.bundle \
   https://s3.amazonaws.com/sentieon-release/other/SentieonIlluminaWGS2.2.bundle
-wget -O data/reference/models/DNAscopeIlluminaWES2.1.bundle \
-  https://s3.amazonaws.com/sentieon-release/other/DNAscopeIlluminaWES2.1.bundle
 
 export DNASCOPE_WGS_MODEL="$PWD/data/reference/models/SentieonIlluminaWGS2.2.bundle"
-export DNASCOPE_WES_MODEL="$PWD/data/reference/models/DNAscopeIlluminaWES2.1.bundle"
 ```
 
 > **Note:** The trial license (up to 128 threads) is valid until **April 15th, 2026**.
@@ -220,50 +212,6 @@ for COV in 10 20 30 50; do
 done
 ```
 
-### 3.3 WES FASTQs
-
-```bash
-# pwd: variant-calling-benchmark/data
-
-SIM_DIR="simulated"
-PREFIX="SIMULATED_SAMPLE_chr22"
-MUTATED_FASTA="${SIM_DIR}/${PREFIX}.simseq.genome.fa"
-EXOME_BED="reference/Exome-Agilent_V6.chr22.bed"
-
-# --- Pad exome targets before extracting FASTA for read simulation ---
-# Most exons are 100–200 bp, shorter than ART's fragment size (-m 350).
-# Without padding, art_illumina drops short sequences entirely (→ massive FN)
-# and creates artificial edge-alignment artifacts (→ spurious FP).
-# Adding 400 bp flanks ensures every target generates proper paired-end reads.
-# Variant callers and hap.py still use the strict, unpadded EXOME_BED.
-samtools faidx "${MUTATED_FASTA}"
-bedtools slop -i "${EXOME_BED}" -g reference/chr22.fa.fai -b 400 \
-  | bedtools merge > "reference/Exome_padded400.chr22.bed"
-
-bedtools getfasta -fi "${MUTATED_FASTA}" \
-  -bed "reference/Exome_padded400.chr22.bed" \
-  -fo "${SIM_DIR}/${PREFIX}_exome_padded.fa"
-
-for COV in 50 100 200; do
-  art_illumina \
-    -ss HS25 \
-    -i "${SIM_DIR}/${PREFIX}_exome_padded.fa" \
-    -p \
-    -l 150 \
-    -f "${COV}" \
-    -m 350 \
-    -s 50 \
-    -rs 42 \
-    -o "${SIM_DIR}/${PREFIX}_${COV}x_wes_" \
-    -na
-
-  mv "${SIM_DIR}/${PREFIX}_${COV}x_wes_1.fq" "${SIM_DIR}/${PREFIX}_${COV}x_wes_R1.fastq"
-  mv "${SIM_DIR}/${PREFIX}_${COV}x_wes_2.fq" "${SIM_DIR}/${PREFIX}_${COV}x_wes_R2.fastq"
-  gzip "${SIM_DIR}/${PREFIX}_${COV}x_wes_R1.fastq"
-  gzip "${SIM_DIR}/${PREFIX}_${COV}x_wes_R2.fastq"
-done
-```
-
 ## 4. Shared Preprocessing
 
 The shared preprocessing BAM is the only valid input for Track A comparisons.
@@ -283,20 +231,6 @@ for COV in 10 20 30 50; do
 
   bwa mem -t 4 -M \
     -R "@RG\tID:${PREFIX}_${COV}x\tSM:SIMULATED_SAMPLE\tPL:ILLUMINA\tLB:lib1\tPU:unit1" \
-    "${REF}" "${R1}" "${R2}" | \
-    samtools sort -@ 4 -m 2G -o "${OUTDIR}/${PREFIX}_aligned.bam" -
-
-  samtools index "${OUTDIR}/${PREFIX}_aligned.bam"
-done
-
-for COV in 50 100 200; do
-  R1="data/simulated/${PREFIX}_${COV}x_wes_R1.fastq.gz"
-  R2="data/simulated/${PREFIX}_${COV}x_wes_R2.fastq.gz"
-  OUTDIR="results/preprocessing/${COV}x_wes"
-  mkdir -p "${OUTDIR}" "logs/${COV}x_wes"
-
-  bwa mem -t 4 -M \
-    -R "@RG\tID:${PREFIX}_${COV}x_wes\tSM:SIMULATED_SAMPLE\tPL:ILLUMINA\tLB:lib1\tPU:unit1" \
     "${REF}" "${R1}" "${R2}" | \
     samtools sort -@ 4 -m 2G -o "${OUTDIR}/${PREFIX}_aligned.bam" -
 
@@ -329,26 +263,6 @@ for COV in 10 20 30 50; do
 
   echo "FINAL_BAM=${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/bam_path.sh"
 done
-
-for COV in 50 100 200; do
-  OUTDIR="results/preprocessing/${COV}x_wes"
-
-  gatk MarkDuplicates \
-    --java-options "-Xmx12G -XX:ParallelGCThreads=2" \
-    -I "${OUTDIR}/${PREFIX}_aligned.bam" \
-    -O "${OUTDIR}/${PREFIX}_dedup.bam" \
-    -M "${OUTDIR}/${PREFIX}_dup_metrics.txt" \
-    --VALIDATION_STRINGENCY SILENT \
-    --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 \
-    --CREATE_INDEX true
-
-  samtools stats "${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/${PREFIX}_stats.txt"
-  samtools flagstat "${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/${PREFIX}_flagstat.txt"
-  samtools idxstats "${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/${PREFIX}_idxstats.txt"
-  mosdepth -t 4 --by 1000 "${OUTDIR}/${PREFIX}_coverage" "${OUTDIR}/${PREFIX}_dedup.bam"
-
-  echo "FINAL_BAM=${OUTDIR}/${PREFIX}_dedup.bam" > "${OUTDIR}/bam_path.sh"
-done
 ```
 
 ## 5. Variant Calling
@@ -364,14 +278,6 @@ for COV in 10 20 30 50; do
   bash pipelines/06_call_freebayes.sh "${COV}"
   bash pipelines/07_call_dnascope.sh "${COV}"
 done
-
-for COV in 50 100 200; do
-  bash pipelines/03_call_hc_wes.sh "${COV}"
-  bash pipelines/04_call_dv_wes.sh "${COV}"
-  bash pipelines/05_call_strelka_wes.sh "${COV}"
-  bash pipelines/06_call_freebayes_wes.sh "${COV}"
-  bash pipelines/07_call_dnascope_wes.sh "${COV}"
-done
 ```
 
 ### 5.2 Optional: DNAscope From Raw FASTQ
@@ -382,10 +288,6 @@ Optional end-to-end DNAscope from the simulated raw FASTQs:
 # pwd: variant-calling-benchmark
 for COV in 10 20 30 50; do
   bash pipelines/07_call_dnascope_fastq.sh "${COV}"
-done
-
-for COV in 50 100 200; do
-  bash pipelines/07_call_dnascope_fastq_wes.sh "${COV}"
 done
 ```
 
@@ -420,16 +322,13 @@ Rscript visualization/benchmark_plots.R results/eval/all_stats.tsv results/plots
 python visualization/plot_summary.py results/eval/all_stats.tsv results/plots
 ```
 
-Both plotting scripts now create separate output sets per `Mode + Coverage` combination to avoid mixing WGS and WES or collapsing multiple coverages into the same figure.
+Both plotting scripts now create separate output sets per coverage level.
 
 ## 8. Method Notes
 
 - Track A is the paper-grade benchmark because all callers receive the same dedup BAM.
 - The optional DNAscope FASTQ runs are useful to show Sentieon's end-to-end behavior, but they are not a fair caller-only comparison.
-- The archived HG002 depth study in `archive/-Impact-of-Sequencing-Depth-on-Variant-Detection--main/` is exome-only chr22 downsampling. It supports qualitative depth intuition only:
-  - `<=10x` is unstable
-  - `~40x` is workable for general research use
-  - indels benefit from higher depth
+- WGS coverages 10x/20x/30x/50x span the regime from low-depth research to production-grade sequencing, enabling depth-impact analysis.
 
 ## 9. Future Work
 

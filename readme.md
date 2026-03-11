@@ -1,11 +1,9 @@
 # Variant Calling Benchmark
 
-Benchmark variant callers on simulated `chr22` Illumina data with one primary comparison track and one optional Sentieon end-to-end path:
+Benchmark variant callers on simulated `chr22` Illumina WGS data with one primary comparison track and one optional Sentieon end-to-end path:
 
 - Primary benchmark: fair head-to-head comparison on the same shared dedup BAM
 - Optional DNAscope FASTQ runs: end-to-end Sentieon alignment + calling kept separate from the fair comparison
-
-The repository keeps WGS and WES as separate study modes.
 
 ## Current Scope
 
@@ -18,9 +16,7 @@ Implemented benchmark components:
   - Strelka2 + Manta
   - FreeBayes
   - Sentieon DNAscope
-- Optional end-to-end DNAscope from raw FASTQ:
-  - WGS
-  - WES
+- Optional end-to-end DNAscope from raw FASTQ
 - Truth-based evaluation with hap.py + RTG vcfeval
 - Summary plots from `results/eval/all_stats.tsv`
 
@@ -33,16 +29,12 @@ Those items are future work only, not runnable workflow steps.
 
 ## Study Design
 
-Main coverage grid:
-
-- WGS: `10x 20x 30x 50x`
-- WES: `50x 100x 200x`
+Coverage grid: `10x 20x 30x 50x`
 
 Design rules:
 
 - The shared-BAM track is the primary benchmark result because every caller sees the same dedup BAM.
 - The optional DNAscope FASTQ runs are supplementary because alignment is part of the pipeline and cannot be interpreted as a fair caller-only comparison.
-- The archived `-Impact-of-Sequencing-Depth-on-Variant-Detection--main` project is an HG002 chr22 exome downsampling study. Its findings are useful only as qualitative coverage guidance, not as WGS-vs-WES evidence.
 
 ## Repository Layout
 
@@ -53,15 +45,16 @@ variant-calling-benchmark/
 ├── evaluation/
 │   ├── _happy_common.sh
 │   ├── eval_happy.sh
+│   ├── fix_truth_vcf.sh
 │   └── gather_stats.sh
 ├── pipelines/
 │   ├── _sentieon_common.sh
-│   ├── 03_call_hc*.sh
-│   ├── 04_call_dv*.sh
-│   ├── 05_call_strelka*.sh
-│   ├── 06_call_freebayes*.sh
-│   ├── 07_call_dnascope*.sh
-│   └── 07_call_dnascope_fastq*.sh
+│   ├── 03_call_hc.sh
+│   ├── 04_call_dv.sh
+│   ├── 05_call_strelka.sh
+│   ├── 06_call_freebayes.sh
+│   ├── 07_call_dnascope.sh
+│   └── 07_call_dnascope_fastq.sh
 ├── visualization/
 │   ├── benchmark_plots.R
 │   └── plot_summary.py
@@ -91,21 +84,9 @@ for COV in 10 20 30 50; do
   bash pipelines/07_call_dnascope.sh "${COV}"
 done
 
-for COV in 50 100 200; do
-  bash pipelines/03_call_hc_wes.sh "${COV}"
-  bash pipelines/04_call_dv_wes.sh "${COV}"
-  bash pipelines/05_call_strelka_wes.sh "${COV}"
-  bash pipelines/06_call_freebayes_wes.sh "${COV}"
-  bash pipelines/07_call_dnascope_wes.sh "${COV}"
-done
-
 # Optional: end-to-end DNAscope from raw FASTQs
 for COV in 10 20 30 50; do
   bash pipelines/07_call_dnascope_fastq.sh "${COV}"
-done
-
-for COV in 50 100 200; do
-  bash pipelines/07_call_dnascope_fastq_wes.sh "${COV}"
 done
 
 # Evaluation
@@ -120,14 +101,13 @@ python visualization/plot_summary.py results/eval/all_stats.tsv results/plots
 
 Primary benchmark:
 
-- Variant calls: `results/variants/{coverage}/...` and `results/variants/{coverage}_wes/...`
+- Variant calls: `results/variants/{coverage}/...`
 - Evaluation: `results/eval/...`
 - Aggregated stats: `results/eval/all_stats.tsv`
 
 Benchmark runtime / CPU / RSS are appended per coverage to:
 
 - `logs/{coverage}/benchmark_metrics.tsv`
-- `logs/{coverage}_wes/benchmark_metrics.tsv`
 
 ## Sentieon Notes
 
@@ -137,45 +117,14 @@ Required inputs for DNAscope:
 
 - `SENTIEON_LICENSE`
 - `DNASCOPE_WGS_MODEL` pointing to a `.bundle` file
-- `DNASCOPE_WES_MODEL` pointing to a `.bundle` file
 
-If you previously extracted the Sentieon model bundles and exported `DNASCOPE_*_MODEL` as those directories, update them to the original `.bundle` archive paths instead. The scripts now resolve a sibling `.bundle` automatically when possible, but the canonical configuration is the archive file.
+If you previously extracted the Sentieon model bundles and exported `DNASCOPE_WGS_MODEL` as a directory, update it to the original `.bundle` archive path instead. The scripts now resolve a sibling `.bundle` automatically when possible, but the canonical configuration is the archive file.
 
 The shared-BAM DNAscope scripts use the shared dedup BAM directly. This is the fair-comparison path and matches official Sentieon support for variant calling from sorted BAM/CRAM.
 
-The optional `07_call_dnascope_fastq*.sh` scripts run the full DNAscope alignment + calling pipeline from raw FASTQ for WGS and WES. Treat those as separate end-to-end experiments, not as shared-BAM fair-comparison runs.
+The optional `07_call_dnascope_fastq.sh` script runs the full DNAscope alignment + calling pipeline from raw FASTQ. Treat it as a separate end-to-end experiment, not as a shared-BAM fair-comparison run.
 
 ## References
 
 - Sentieon CLI docs: https://support.sentieon.com/docs/sentieon_cli/
 - Sentieon models: https://github.com/Sentieon/sentieon-models
-- Archived depth study: `archive/-Impact-of-Sequencing-Depth-on-Variant-Detection--main/`
-
-
-## Test
-
-```bash
-# Backup file gốc
-cp ${SIM_DIR}/${PREFIX}_truth.vcf.gz ${SIM_DIR}/${PREFIX}_truth.vcf.gz.bak
-
-# Giải nén
-gunzip ${SIM_DIR}/${PREFIX}_truth.vcf.gz
-
-TRUTH_VCF_RAW="${SIM_DIR}/${PREFIX}_truth.vcf"
-
-# Thêm sample column bằng cách:
-# 1. Thêm FORMAT và SAMPLE vào header
-# 2. Thêm GT=0/1 cho mỗi variant
-awk 'BEGIN{OFS="\t"} 
-/^##/{print; next} 
-/^#CHROM/{
-    print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">";
-    print $0, "FORMAT", "SIMULATED_SAMPLE"; 
-    next
-} 
-{print $0, "GT", "0/1"}' "${TRUTH_VCF_RAW}" > "${TRUTH_VCF_RAW}.tmp"
-
-mv "${TRUTH_VCF_RAW}.tmp" "${TRUTH_VCF_RAW}"
-bgzip "${TRUTH_VCF_RAW}"
-tabix -f -p vcf "${TRUTH_VCF_RAW}.gz"
-```

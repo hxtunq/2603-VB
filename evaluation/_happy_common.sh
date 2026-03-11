@@ -44,13 +44,7 @@ happy_prepare_query_vcf() {
 
 happy_cov_suffix() {
     local cov="$1"
-    local mode="$2"
-
-    if [[ "${mode}" == "WES" ]]; then
-        printf '%sx_wes\n' "${cov}"
-    else
-        printf '%sx\n' "${cov}"
-    fi
+    printf '%sx\n' "${cov}"
 }
 
 happy_make_comparison() {
@@ -63,15 +57,11 @@ happy_make_comparison() {
     local happy_args=()
     local strat_args=()
 
-    cov_suffix=$(happy_cov_suffix "${cov}" "${mode}")
+    cov_suffix=$(happy_cov_suffix "${cov}")
     eval_out="${eval_root}/${cov_suffix}/${mode}/${caller_name}_eval_data"
     mkdir -p "${eval_out}"
 
     curr_vcf=$(happy_prepare_query_vcf "${curr_vcf}")
-
-    if [[ "${mode}" == "WES" ]]; then
-        happy_args=(-T "/ref/$(basename "${EXOME_BED}")")
-    fi
 
     if [[ -f "${STRATIFICATION_TSV}" ]]; then
         strat_args=(--stratification "/ref/$(basename "${STRATIFICATION_TSV}")")

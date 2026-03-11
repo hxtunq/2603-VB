@@ -135,27 +135,15 @@ sentieon_log_metrics() {
 
 sentieon_set_fastq_paths() {
     local cov="$1"
-    local mode="$2"
 
-    if [[ "${mode}" == "wes" ]]; then
-        FASTQ_R1="${SIM_DIR}/${PREFIX}_${cov}x_wes_R1.fastq.gz"
-        FASTQ_R2="${SIM_DIR}/${PREFIX}_${cov}x_wes_R2.fastq.gz"
-        COV_SUFFIX="${cov}x_wes"
-    else
-        FASTQ_R1="${SIM_DIR}/${PREFIX}_${cov}x_R1.fastq.gz"
-        FASTQ_R2="${SIM_DIR}/${PREFIX}_${cov}x_R2.fastq.gz"
-        COV_SUFFIX="${cov}x"
-    fi
+    FASTQ_R1="${SIM_DIR}/${PREFIX}_${cov}x_R1.fastq.gz"
+    FASTQ_R2="${SIM_DIR}/${PREFIX}_${cov}x_R2.fastq.gz"
+    COV_SUFFIX="${cov}x"
 }
 
 sentieon_build_readgroup() {
     local cov="$1"
-    local mode="${2:-wgs}"
     local rg_id="${SAMPLE_NAME}_${cov}x"
-
-    if [[ "${mode}" == "wes" ]]; then
-        rg_id="${SAMPLE_NAME}_${cov}x_wes"
-    fi
 
     printf '@RG\tID:%s\tSM:%s\tPL:ILLUMINA\tLB:lib1\tPU:unit1' \
         "${rg_id}" "${SAMPLE_NAME}"

@@ -1,7 +1,7 @@
 #!/bin/bash
 #===============================================================================
 # CONFIG: Cấu hình chung cho pipeline variant calling benchmarking
-# Theo GATK Best Practices (nf-core/sarek) — Multi-coverage, WGS + WES
+# Theo GATK Best Practices (nf-core/sarek) — Multi-coverage WGS
 #===============================================================================
 
 #-------------------------------------------------------------------------------
@@ -71,10 +71,7 @@ export INDEL_MAX_LEN=30         # Up to 30bp to test longer indels
 
 # ART Illumina — multi-coverage design
 # WGS coverages: low to medium (like GIAB WGS 22-37x)
-# Higher coverages: for WES-like evaluation (GIAB WES 183-249x)
 export COVERAGES_WGS=(10 20 30 50)
-export COVERAGES_WES=(50 100 200)
-export COVERAGES_ALL=(10 20 30 50 100 200)
 
 export READ_LENGTH=150
 export FRAGMENT_MEAN=350
@@ -97,14 +94,8 @@ export PREFIX="${SAMPLE_NAME}_${CHR_TO_USE}"
 export READ_GROUP="@RG\\tID:${SAMPLE_NAME}\\tSM:${SAMPLE_NAME}\\tPL:ILLUMINA\\tLB:lib1\\tPU:unit1"
 
 #-------------------------------------------------------------------------------
-# BED FILES — Exome targets + stratification
+# BED FILES — Confidence region + stratification
 #-------------------------------------------------------------------------------
-# Exome target BED (Agilent SureSelect V6, extracted for chr22)
-export EXOME_BED="${REF_DIR}/Exome-Agilent_V6.chr22.bed"
-
-# CDS-only BED (canonical protein-coding, extracted for chr22)
-export CDS_BED="${REF_DIR}/CDS-canonical.chr22.bed"
-
 # Mappability tricky regions (low-mappability, extracted for chr22)
 export MAPPABILITY_BED="${REF_DIR}/umap_k100_mappability.chr22.bed.gz"
 
@@ -149,11 +140,9 @@ fi
 # sentieon-cli dnascope requires both sentieon-cli and sentieon in PATH.
 # sentieon-cli dnascope expects -m/--model_bundle to be the .bundle archive file.
 # Do not point these variables at unpacked directories.
-# Override DNASCOPE_WGS_MODEL / DNASCOPE_WES_MODEL if you download newer bundles.
+# Override DNASCOPE_WGS_MODEL if you download newer bundles.
 # WGS: SentieonIlluminaWGS2.2.bundle
-# WES: DNAscopeIlluminaWES2.1.bundle
 export DNASCOPE_WGS_MODEL="${DNASCOPE_WGS_MODEL:-${REF_DIR}/models/SentieonIlluminaWGS2.2.bundle}"
-export DNASCOPE_WES_MODEL="${DNASCOPE_WES_MODEL:-${REF_DIR}/models/DNAscopeIlluminaWES2.1.bundle}"
 
 # PCR-free library prep (affects DNAscope indel model)
 export PCRFREE="${PCRFREE:-true}"
@@ -193,4 +182,3 @@ echo "[CONFIG] Loaded successfully"
 echo "[CONFIG] Project: ${PROJECT_DIR}"
 echo "[CONFIG] Chromosome: ${CHR_TO_USE}"
 echo "[CONFIG] WGS coverages: ${COVERAGES_WGS[*]}"
-echo "[CONFIG] WES coverages: ${COVERAGES_WES[*]}"
