@@ -37,9 +37,10 @@ COLORS = {
     "ST": "#E91E63",
     "FB": "#FF9800",
     "DS": "#009688",
+    "DSF": "#7B1FA2",
 }
-MARKERS = {"HC": "o", "DV": "s", "ST": "D", "FB": "^", "DS": "v"}
-CALLER_ORDER = ["HC", "DV", "ST", "FB", "DS"]
+MARKERS = {"HC": "o", "DV": "s", "ST": "D", "FB": "^", "DS": "v", "DSF": "P"}
+CALLER_ORDER = ["HC", "DV", "ST", "FB", "DS", "DSF"]
 
 
 def alias_caller(name: str) -> str:
@@ -52,6 +53,8 @@ def alias_caller(name: str) -> str:
         return "HC"
     if name.startswith("strelka2"):
         return "ST"
+    if name.startswith("dnascope_fastq"):
+        return "DSF"
     if name.startswith("dnascope"):
         return "DS"
     return name.upper()

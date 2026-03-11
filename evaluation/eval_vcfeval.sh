@@ -20,7 +20,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 source "${SCRIPT_DIR}/../config/config.sh"
 
 # ---------- Callers ----------
-WGS_CALLERS="${WGS_CALLERS:-gatk deepvariant strelka2 freebayes dnascope}"
+WGS_CALLERS="${WGS_CALLERS:-gatk deepvariant strelka2 freebayes dnascope dnascope_fastq}"
 
 # ---------- VCF naming (must match pipelines/*.sh) ----------
 get_vcf() {
@@ -32,6 +32,7 @@ get_vcf() {
         strelka2)        echo "${variant_dir}/strelka2/SS_${CHR_TO_USE}_STRELKA_${cov}x_WGS.vcf.gz" ;;
         freebayes)       echo "${variant_dir}/freebayes/SS_${CHR_TO_USE}_FB_${cov}x_WGS.vcf.gz" ;;
         dnascope)        echo "${variant_dir}/dnascope/SS_${CHR_TO_USE}_DNASCOPE_${cov}x_WGS.vcf.gz" ;;
+        dnascope_fastq)  echo "${variant_dir}/dnascope_fastq/SS_${CHR_TO_USE}_DNASCOPE_FASTQ_${cov}x_WGS.vcf.gz" ;;
         *)               echo "ERROR: unknown caller: ${caller}" >&2; return 1 ;;
     esac
 }
@@ -42,8 +43,9 @@ caller_alias() {
         deepvariant) echo "DV" ;;
         strelka2)    echo "ST" ;;
         freebayes)   echo "FB" ;;
-        dnascope)    echo "DS" ;;
-        *)           echo "$1" ;;
+        dnascope)        echo "DS" ;;
+        dnascope_fastq)  echo "DSF" ;;
+        *)               echo "$1" ;;
     esac
 }
 
@@ -53,7 +55,7 @@ prepare_truth() {
     local truth_tmp="${truth_prepared}.tmp"
     local sample_count=0
 
-    if [[ -s "${truth_prepared}" && -s "${truth_prepared}.tbi" ]]; then
+    if [[ -s "${truth_prepared}" && -s "${truth_prepared}.tbi" && "${truth_prepared}" -nt "${TRUTH_VCF}" ]]; then
         echo "[TRUTH] Already prepared: ${truth_prepared}"
         return
     fi
@@ -64,9 +66,26 @@ prepare_truth() {
     sample_count=$(bcftools query -l "${TRUTH_VCF}" | awk 'NF {c++} END {print c+0}')
 
     if (( sample_count > 0 )); then
-        echo "[TRUTH] Input truth VCF already has ${sample_count} sample(s); preserving existing FORMAT/sample columns."
-        bcftools norm -f "${REF_FASTA}" -m -both "${TRUTH_VCF}" \
-            | bgzip -c > "${truth_tmp}"
+        echo "[TRUTH] Input truth VCF has ${sample_count} sample(s); keeping only the first sample column."
+        zcat "${TRUTH_VCF}" | awk 'BEGIN{OFS="\t"; ff=0; gt=0}
+          /^##fileformat=/ {ff=1; print; next}
+          /^##FORMAT=<ID=GT,/ {gt=1; print; next}
+          /^##/ {print; next}
+          /^#CHROM/ {
+            if(ff==0) print "##fileformat=VCFv4.2"
+            if(gt==0) print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">"
+            print $1,$2,$3,$4,$5,$6,$7,$8,"FORMAT","TRUTH"
+            next
+          }
+          {
+            if(NF < 10) {
+              printf "ERROR: expected FORMAT + sample columns at %s:%s but found %d fields\n", $1, $2, NF > "/dev/stderr"
+              exit 1
+            }
+            print $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
+          }
+        ' | bcftools norm -f "${REF_FASTA}" -m -both \
+          | bgzip -c > "${truth_tmp}"
     else
         echo "[TRUTH] Input truth VCF is sites-only; adding GT=1/1 sample column."
         zcat "${TRUTH_VCF}" | awk 'BEGIN{OFS="\t"; ff=0}
