@@ -55,11 +55,11 @@ echo "Header sample check:"
 bcftools query -l "${FIXED_VCF}"
 echo ""
 echo "First 5 variants (GT column):"
-bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t[%GT]\n' "${FIXED_VCF}" | head -5
+bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t[%GT]\n' "${FIXED_VCF}" | head -5 || true
 echo ""
 
-NSNP=$(bcftools view -v snps "${FIXED_VCF}" | grep -cv '^#')
-NINDEL=$(bcftools view -v indels "${FIXED_VCF}" | grep -cv '^#')
+NSNP=$(bcftools view -v snps "${FIXED_VCF}" | grep -cv '^#' || true)
+NINDEL=$(bcftools view -v indels "${FIXED_VCF}" | grep -cv '^#' || true)
 echo "SNP count:   ${NSNP}"
 echo "INDEL count: ${NINDEL}"
 
