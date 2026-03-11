@@ -93,12 +93,14 @@ PY
 
 # quay về env ban đầu
 
-bedtools subtract -a chr22_highconf_tmp.bed -b umap_k100_mappability.chr22.bed.gz > chr22_highconf.bed
+# UMAP k=100 stores uniquely mappable regions, so keep those in the callable/high-confidence BED.
+bedtools intersect -a chr22_highconf_tmp.bed -b umap_k100_mappability.chr22.bed.gz > chr22_highconf.bed
+bedtools subtract -a chr22_highconf_tmp.bed -b umap_k100_mappability.chr22.bed.gz > chr22_low_mappability.bed
 rm chr22_highconf_tmp.bed
 
 cat > stratification_chr22.tsv <<'EOF'
 CDS	CDS-canonical.chr22.bed
-Low_Mappability	umap_k100_mappability.chr22.bed.gz
+Low_Mappability	chr22_low_mappability.bed
 EOF
 
 rtg format -o chr22.sdf chr22.fa

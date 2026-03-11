@@ -96,10 +96,10 @@ export READ_GROUP="@RG\\tID:${SAMPLE_NAME}\\tSM:${SAMPLE_NAME}\\tPL:ILLUMINA\\tL
 #-------------------------------------------------------------------------------
 # BED FILES — Confidence region + stratification
 #-------------------------------------------------------------------------------
-# Mappability tricky regions (low-mappability, extracted for chr22)
+# UMAP k=100 uniquely mappable regions for chr22
 export MAPPABILITY_BED="${REF_DIR}/umap_k100_mappability.chr22.bed.gz"
 
-# Full-chromosome high-confidence region (for simulated data = non-N regions)
+# High-confidence region = non-N reference bases intersected with uniquely mappable regions
 export TRUTH_BED="${REF_DIR}/${CHR_TO_USE}_highconf.bed"
 
 # Stratification TSV for hap.py (list of BED files)
