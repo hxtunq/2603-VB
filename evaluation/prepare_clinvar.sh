@@ -104,7 +104,9 @@ if [[ ! -f "${CLINVAR_FILTERED}" ]]; then
             info = $8
             # Extract CLNSIG value
             clnsig = ""
-            if (match(info, /CLNSIG=([^;]+)/, m)) clnsig = m[1]
+            if (match(info, /CLNSIG=[^;]+/)) {
+                clnsig = substr(info, RSTART+7, RLENGTH-7)
+            }
 
             # Skip if conflicting
             if (clnsig ~ /Conflicting/) next
