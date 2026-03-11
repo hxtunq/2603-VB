@@ -24,6 +24,21 @@ happy_prepare_query_vcf() {
         curr_vcf="${curr_vcf}.gz"
     fi
 
+    # --- PASS filter + Normalize for fair evaluation ---
+    local vcf_dir vcf_base norm_vcf
+    vcf_dir=$(dirname "${curr_vcf}")
+    vcf_base=$(basename "${curr_vcf}" .vcf.gz)
+    norm_vcf="${vcf_dir}/${vcf_base}.norm.vcf.gz"
+
+    if [[ ! -f "${norm_vcf}" ]]; then
+        echo "  [PREP] Filtering PASS + normalizing: $(basename "${curr_vcf}")"
+        bcftools view -f 'PASS,.' "${curr_vcf}" \
+            | bcftools norm -m -both -f "${REF_FASTA}" \
+            | bgzip -c > "${norm_vcf}"
+        tabix -f -p vcf "${norm_vcf}"
+    fi
+    curr_vcf="${norm_vcf}"
+
     printf '%s\n' "${curr_vcf}"
 }
 

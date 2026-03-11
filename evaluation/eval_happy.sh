@@ -34,6 +34,7 @@ get_vcf() {
 
 happy_require_command docker
 happy_require_command bgzip
+happy_require_command bcftools
 happy_require_command tabix
 happy_require_file "${TRUTH_VCF}"
 happy_require_file "${REF_FASTA}"
