@@ -298,23 +298,24 @@ These runs use their own alignment pipeline from FASTQ, so keep them separate fr
 
 ## 6. Evaluation
 
-### 6.1 Main Track
+### 6.1 Main Track — RTG VCFeval
+
+Direct RTG vcfeval evaluation (no Docker needed). Runs all 5 callers × 4 coverages and produces FN/FP/TP VCFs + aggregated stats:
 
 ```bash
 # pwd: variant-calling-benchmark
-bash evaluation/eval_happy.sh
+bash evaluation/eval_vcfeval.sh
 ```
 
 Outputs:
 
-- Evaluation tree: `results/eval/...`
-- Aggregated stats: `results/eval/all_stats.tsv`
+- Per-caller results: `results/eval/vcfeval/{COV}x/{caller}/` → `fn.vcf.gz`, `fp.vcf.gz`, `tp.vcf.gz`, `tp-baseline.vcf.gz`, `summary.txt`
+- Aggregated stats: `results/eval/vcfeval_all_stats.tsv`
 
-`evaluation/gather_stats.sh` is the single collector and can also be called manually:
+To run for specific callers only:
 
 ```bash
-# pwd: variant-calling-benchmark
-bash evaluation/gather_stats.sh results/eval results/eval/all_stats.tsv
+WGS_CALLERS="gatk deepvariant" bash evaluation/eval_vcfeval.sh
 ```
 
 ### 6.2 Concordance Analysis
@@ -340,29 +341,68 @@ python visualization/plot_concordance.py \
 
 ## 7. Visualization
 
+### 7.1 Summary Plots
+
 ```bash
 # pwd: variant-calling-benchmark
 Rscript visualization/benchmark_plots.R results/eval/all_stats.tsv results/plots
 python visualization/plot_summary.py results/eval/all_stats.tsv results/plots
 ```
 
-Both plotting scripts create separate output sets per coverage level plus cross-coverage comparison plots:
-
 - **Per-coverage:** F1 bar charts, Precision-Recall scatter, TP/FP/FN counts
-- **Cross-coverage (new):**
+- **Cross-coverage:**
   - `grouped_bars_{snp,indel}_*.png` — F1/Recall/Precision grouped by coverage
   - `f1_heatmap_*.png` — Callers × Coverage heatmap
   - `snp_vs_indel_*.png` — Side-by-side SNP vs INDEL F1
   - `variant_breakdown_*.png` — TP/FP/FN per variant type across coverages
-  - `variant_breakdown_*.tsv` — Summary table with variant type breakdown
 
-## 8. Method Notes
+### 7.2 Coverage Comparison Plots
+
+Highlights how each caller's performance changes across 10x→50x:
+
+```bash
+# pwd: variant-calling-benchmark
+python visualization/plot_coverage_comparison.py \
+    results/eval/vcfeval_all_stats.tsv results/plots
+```
+
+Generates:
+- `coverage_lines.png` — F1/Precision/Recall line plots vs coverage
+- `coverage_delta_bars.png` — Metric improvement from 10x→50x
+- `coverage_radar.png` — Radar chart per coverage
+- `coverage_fn_fp_area.png` — Stacked FN+FP area chart
+- `coverage_f1_heatmap.png` — F1 callers × coverage heatmap
+
+## 8. AlphaGenome Scoring
+
+Score FN/FP variants with AlphaGenome for functional impact analysis:
+
+```bash
+# pwd: variant-calling-benchmark
+export ALPHAGENOME_API_KEY="your-key"
+
+# Single caller × single coverage
+python batch_alphagenome_fn_fp.py --caller gatk --error-type FN --coverage 30
+
+# All coverages at once
+python batch_alphagenome_fn_fp.py --caller deepvariant --error-type FP --coverage all
+
+# All 5 callers × FN + FP
+for CALLER in gatk deepvariant strelka2 freebayes dnascope; do
+  python batch_alphagenome_fn_fp.py --caller $CALLER --error-type FN --coverage all
+  python batch_alphagenome_fn_fp.py --caller $CALLER --error-type FP --coverage all
+done
+```
+
+Output: `results/alphagenome/{caller}_{COV}x_{FN|FP}_variant_scores_tidy.csv`
+
+## 9. Method Notes
 
 - Track A is the paper-grade benchmark because all callers receive the same dedup BAM.
 - The optional DNAscope FASTQ runs are useful to show Sentieon's end-to-end behavior, but they are not a fair caller-only comparison.
 - WGS coverages 10x/20x/30x/50x span the regime from low-depth research to production-grade sequencing, enabling depth-impact analysis.
 
-## 9. Future Work
+## 10. Future Work
 
 Planned but not implemented in this repo:
 
