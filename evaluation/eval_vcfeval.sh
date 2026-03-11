@@ -20,7 +20,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 source "${SCRIPT_DIR}/../config/config.sh"
 
 # ---------- Callers ----------
-WGS_CALLERS="${WGS_CALLERS:-gatk deepvariant strelka2 freebayes dnascope dnascope_fastq}"
+WGS_CALLERS="${WGS_CALLERS:-gatk deepvariant strelka2 freebayes dnascope}"
 
 # ---------- VCF naming (must match pipelines/*.sh) ----------
 get_vcf() {
@@ -32,7 +32,6 @@ get_vcf() {
         strelka2)        echo "${variant_dir}/strelka2/SS_${CHR_TO_USE}_STRELKA_${cov}x_WGS.vcf.gz" ;;
         freebayes)       echo "${variant_dir}/freebayes/SS_${CHR_TO_USE}_FB_${cov}x_WGS.vcf.gz" ;;
         dnascope)        echo "${variant_dir}/dnascope/SS_${CHR_TO_USE}_DNASCOPE_${cov}x_WGS.vcf.gz" ;;
-        dnascope_fastq)  echo "${variant_dir}/dnascope_fastq/SS_${CHR_TO_USE}_DNASCOPE_FASTQ_${cov}x_WGS.vcf.gz" ;;
         *)               echo "ERROR: unknown caller: ${caller}" >&2; return 1 ;;
     esac
 }
@@ -43,9 +42,8 @@ caller_alias() {
         deepvariant) echo "DV" ;;
         strelka2)    echo "ST" ;;
         freebayes)   echo "FB" ;;
-        dnascope)        echo "DS" ;;
-        dnascope_fastq)  echo "DSF" ;;
-        *)               echo "$1" ;;
+        dnascope)    echo "DS" ;;
+        *)           echo "$1" ;;
     esac
 }
 

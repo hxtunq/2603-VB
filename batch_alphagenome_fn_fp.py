@@ -4,7 +4,7 @@
 Each invocation handles exactly one caller × one coverage × one error-type.
 Results are written incrementally in batches to avoid OOM.
 
-Supported callers: gatk, deepvariant, strelka2, freebayes, dnascope, dnascope_fastq
+Supported callers: gatk, deepvariant, strelka2, freebayes, dnascope
 Supported coverages: 10, 20, 30, 50 (or 'all' to loop over all)
 
 Inputs:
@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
         description="Score FN/FP variants of a single caller with AlphaGenome"
     )
     p.add_argument("--caller", required=True,
-                   help="Caller name: gatk, deepvariant, strelka2, freebayes, dnascope, dnascope_fastq")
+                   help="Caller name: gatk, deepvariant, strelka2, freebayes, dnascope")
     p.add_argument("--error-type", required=True, choices=["FN", "FP"],
                    help="Error type: FN or FP")
     p.add_argument("--coverage", required=True,

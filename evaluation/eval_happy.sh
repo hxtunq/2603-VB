@@ -8,7 +8,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 source "${SCRIPT_DIR}/../config/config.sh"
 source "${SCRIPT_DIR}/_happy_common.sh"
 
-WGS_CALLERS="${WGS_CALLERS:-gatk deepvariant strelka2 freebayes dnascope dnascope_fastq}"
+WGS_CALLERS="${WGS_CALLERS:-gatk deepvariant strelka2 freebayes dnascope}"
 
 get_vcf() {
     local caller="$1"
@@ -22,7 +22,6 @@ get_vcf() {
         strelka2)        printf '%s\n' "${variant_dir}/strelka2/SS_${CHR_TO_USE}_STRELKA_${cov}x_${mode}.vcf.gz" ;;
         freebayes)       printf '%s\n' "${variant_dir}/freebayes/SS_${CHR_TO_USE}_FB_${cov}x_${mode}.vcf.gz" ;;
         dnascope)        printf '%s\n' "${variant_dir}/dnascope/SS_${CHR_TO_USE}_DNASCOPE_${cov}x_${mode}.vcf.gz" ;;
-        dnascope_fastq)  printf '%s\n' "${variant_dir}/dnascope_fastq/SS_${CHR_TO_USE}_DNASCOPE_FASTQ_${cov}x_${mode}.vcf.gz" ;;
         *)               return 1 ;;
     esac
 }

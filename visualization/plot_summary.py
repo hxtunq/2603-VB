@@ -24,7 +24,6 @@ COLORS = {
     "ST": "#E91E63",
     "FB": "#FF9800",
     "DS": "#009688",
-    "DSF": "#7B1FA2",
 }
 
 
@@ -37,8 +36,6 @@ def alias_caller(name: str) -> str:
         return "HC"
     if name.startswith("strelka2"):
         return "ST"
-    if name.startswith("dnascope_fastq"):
-        return "DSF"
     if name.startswith("dnascope"):
         return "DS"
     return name
@@ -49,7 +46,7 @@ def sanitize(mode: str, coverage: str) -> str:
 
 
 def ordered_subset(df: pd.DataFrame) -> pd.DataFrame:
-    order = {"HC": 0, "DV": 1, "ST": 2, "FB": 3, "DS": 4, "DSF": 5}
+    order = {"HC": 0, "DV": 1, "ST": 2, "FB": 3, "DS": 4}
     return df.assign(_order=df["CallerAlias"].map(order).fillna(99)).sort_values("_order")
 
 
@@ -134,7 +131,7 @@ def plot_counts(df: pd.DataFrame, mode: str, coverage: str, tag: str) -> None:
 def plot_grouped_bars(df: pd.DataFrame, mode: str) -> None:
     """Grouped bar charts: F1/Recall/Precision per caller, grouped by coverage."""
     coverages = sorted(df["Coverage"].unique(), key=lambda x: int(str(x).replace("x", "")))
-    callers = [c for c in ["HC", "DV", "ST", "FB", "DS", "DSF"] if c in df["CallerAlias"].unique()]
+    callers = [c for c in ["HC", "DV", "ST", "FB", "DS"] if c in df["CallerAlias"].unique()]
 
     for vtype in ["SNP", "INDEL"]:
         subset = df[df["Type"] == vtype]
@@ -182,7 +179,7 @@ def plot_grouped_bars(df: pd.DataFrame, mode: str) -> None:
 
 def plot_f1_heatmap(df: pd.DataFrame, mode: str) -> None:
     """Heatmap: callers × coverage → F1 score, separate for SNP and INDEL."""
-    callers = [c for c in ["HC", "DV", "ST", "FB", "DS", "DSF"] if c in df["CallerAlias"].unique()]
+    callers = [c for c in ["HC", "DV", "ST", "FB", "DS"] if c in df["CallerAlias"].unique()]
     coverages = sorted(df["Coverage"].unique(), key=lambda x: int(str(x).replace("x", "")))
     cov_labels = [str(c) for c in coverages]
 
@@ -228,7 +225,7 @@ def plot_f1_heatmap(df: pd.DataFrame, mode: str) -> None:
 
 def plot_snp_vs_indel_comparison(df: pd.DataFrame, mode: str) -> None:
     """Side-by-side SNP vs INDEL F1 per caller, across coverages."""
-    callers = [c for c in ["HC", "DV", "ST", "FB", "DS", "DSF"] if c in df["CallerAlias"].unique()]
+    callers = [c for c in ["HC", "DV", "ST", "FB", "DS"] if c in df["CallerAlias"].unique()]
     coverages = sorted(df["Coverage"].unique(), key=lambda x: int(str(x).replace("x", "")))
 
     n_covs = len(coverages)
@@ -275,7 +272,7 @@ def plot_variant_type_breakdown(df: pd.DataFrame, mode: str) -> None:
     if not required.issubset(df.columns):
         return
 
-    callers = [c for c in ["HC", "DV", "ST", "FB", "DS", "DSF"] if c in df["CallerAlias"].unique()]
+    callers = [c for c in ["HC", "DV", "ST", "FB", "DS"] if c in df["CallerAlias"].unique()]
     coverages = sorted(df["Coverage"].unique(), key=lambda x: int(str(x).replace("x", "")))
 
     fig, axes = plt.subplots(len(coverages), 2, figsize=(14, 4 * len(coverages)), sharey="row")
