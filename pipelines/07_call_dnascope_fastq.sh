@@ -16,7 +16,7 @@ READGROUP=""
 MODEL_BUNDLE=""
 CMD=()
 
-sentieon_set_fastq_paths "${COV}" "wgs"
+sentieon_set_fastq_paths "${COV}"
 sentieon_skip_if_no_license "DNAscope FASTQ"
 sentieon_require_dnascope_cli_stack
 sentieon_require_file "${FASTQ_R1}"
@@ -29,7 +29,7 @@ MODEL_BUNDLE=$(sentieon_resolve_model_bundle "${DNASCOPE_WGS_MODEL}" "true")
 
 sentieon_prepare_layout "${COV_SUFFIX}" "${CALLER}"
 
-READGROUP=$(sentieon_build_readgroup "${COV}" "wgs")
+READGROUP=$(sentieon_build_readgroup "${COV}")
 OUTPUT_VCF="${OUT_DIR}/SS_${CHR_TO_USE}_DNASCOPE_FASTQ_${COV}x_WGS.vcf.gz"
 
 CMD=(
@@ -42,12 +42,13 @@ CMD=(
     -d "${DBSNP}"
     -t "${THREADS}"
     --assay WGS
-    "${OUTPUT_VCF}"
 )
 
 if [[ "${PCRFREE:-false}" == "true" ]]; then
     CMD+=(--pcr_free)
 fi
+
+CMD+=("${OUTPUT_VCF}")
 
 echo "=== Running Sentieon DNAscope (WGS, raw FASTQ) ==="
 

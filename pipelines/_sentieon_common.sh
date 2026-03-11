@@ -134,7 +134,7 @@ sentieon_log_metrics() {
 }
 
 sentieon_set_fastq_paths() {
-    local cov="$1"
+    local cov="${1:?Usage: sentieon_set_fastq_paths <coverage>}"
 
     FASTQ_R1="${SIM_DIR}/${PREFIX}_${cov}x_R1.fastq.gz"
     FASTQ_R2="${SIM_DIR}/${PREFIX}_${cov}x_R2.fastq.gz"
@@ -142,9 +142,9 @@ sentieon_set_fastq_paths() {
 }
 
 sentieon_build_readgroup() {
-    local cov="$1"
+    local cov="${1:?Usage: sentieon_build_readgroup <coverage>}"
     local rg_id="${SAMPLE_NAME}_${cov}x"
 
-    printf '@RG\tID:%s\tSM:%s\tPL:ILLUMINA\tLB:lib1\tPU:unit1' \
+    printf '@RG\\tID:%s\\tSM:%s\\tPL:ILLUMINA\\tLB:lib1\\tPU:unit1' \
         "${rg_id}" "${SAMPLE_NAME}"
 }

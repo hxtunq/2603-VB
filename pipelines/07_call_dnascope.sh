@@ -40,12 +40,13 @@ CMD=(
     -t "${THREADS}"
     --duplicate_marking none
     --assay WGS
-    "${OUTPUT_VCF}"
 )
 
 if [[ "${PCRFREE:-false}" == "true" ]]; then
     CMD+=(--pcr_free)
 fi
+
+CMD+=("${OUTPUT_VCF}")
 
 echo "=== Running Sentieon DNAscope (WGS, shared BAM) ==="
 

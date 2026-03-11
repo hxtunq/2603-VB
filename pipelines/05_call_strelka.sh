@@ -69,9 +69,10 @@ echo "=== Running Strelka2 (configure + run) ==="
 "
 log_metrics "strelka2" "Strelka2" "${TIMEDIR}/strelka2.time"
 
-# --- Copy output ---
+# --- Copy output + index ---
 cp "${OUT_DIR}/strelkawd/results/variants/variants.vcf.gz" \
    "${FINAL_VCF}"
+tabix -f -p vcf "${FINAL_VCF}"
 
 echo ""
 echo "Strelka2 WGS done (standalone, no Manta):"
