@@ -68,41 +68,6 @@ variant-calling-benchmark/
 └── archive/
 ```
 
-## Quick Start
-
-`workflow.md` contains the detailed setup commands. The high-level execution order is:
-
-```bash
-source config/config.sh
-
-# Build RTG SDF once before hap.py/vcfeval
-rtg format -o "${RTG_SDF}" "${REF_FASTA}"
-
-# Prepare references, truth set, simulated FASTQs, and shared preprocessing
-# See workflow.md for the full commands
-
-# Shared-BAM benchmark
-for COV in 10 20 30 50; do
-  bash pipelines/03_call_hc.sh "${COV}"
-  bash pipelines/04_call_dv.sh "${COV}"
-  bash pipelines/05_call_strelka.sh "${COV}"
-  bash pipelines/06_call_freebayes.sh "${COV}"
-  bash pipelines/07_call_dnascope.sh "${COV}"
-done
-
-# Optional: end-to-end DNAscope from raw FASTQs
-for COV in 10 20 30 50; do
-  bash pipelines/07_call_dnascope_fastq.sh "${COV}"
-done
-
-# Evaluation (refer to workflow.md for concordance and stratification)
-bash evaluation/eval_happy.sh
-
-# Visualization (refer to workflow.md for advanced analysis scripts)
-Rscript visualization/benchmark_plots.R results/eval/all_stats.tsv results/plots
-python visualization/plot_summary.py results/eval/all_stats.tsv results/plots
-```
-
 ## Outputs
 
 Primary benchmark:
@@ -126,8 +91,6 @@ Benchmark runtime / CPU / RSS are appended per coverage to:
 
 ## Sentieon Notes
 
-Shared-BAM DNAscope and raw-FASTQ DNAscope use the local `sentieon-cli` command, and `sentieon-cli dnascope` shells out to `sentieon driver`. Keep both `sentieon-cli` and `sentieon` in `PATH`, or set `SENTIEON_BIN_DIR` before sourcing `config/config.sh`.
-
 Required inputs for DNAscope:
 
 - `SENTIEON_LICENSE`
@@ -136,8 +99,6 @@ Required inputs for DNAscope:
 If you previously extracted the Sentieon model bundles and exported `DNASCOPE_WGS_MODEL` as a directory, update it to the original `.bundle` archive path instead. The scripts now resolve a sibling `.bundle` automatically when possible, but the canonical configuration is the archive file.
 
 The shared-BAM DNAscope scripts use the shared dedup BAM directly. This is the fair-comparison path and matches official Sentieon support for variant calling from sorted BAM/CRAM.
-
-The optional `07_call_dnascope_fastq.sh` script runs the full DNAscope alignment + calling pipeline from raw FASTQ. Treat it as a separate end-to-end experiment, not as a shared-BAM fair-comparison run.
 
 ## References
 
