@@ -65,12 +65,6 @@ tabix -p vcf 1000G_phase1.snps.high_confidence.hg38.chr22.vcf.gz
 ```bash
 # pwd: variant-calling-benchmark/data/reference
 
-wget -O CDS-canonical.bed \
-  https://raw.githubusercontent.com/AstraZeneca-NGS/reference_data/master/hg38/bed/CDS-canonical.bed
-grep -w "chr22" CDS-canonical.bed > CDS-canonical.chr22.bed
-rm CDS-canonical.bed
-
-
 # phải dùng đến env biopython: conda activate biopython
 
 python3 - <<'PY'
@@ -86,9 +80,7 @@ PY
 
 # quay về env ban đầu
 
-cat > stratification_chr22.tsv <<'EOF'
-CDS	CDS-canonical.chr22.bed
-EOF
+> **Note:** The `stratification_chr22.tsv` will be generated later by `evaluation/prepare_stratification_hg38.sh`.
 
 rtg format -o chr22.sdf chr22.fa
 ```
@@ -113,6 +105,9 @@ This generates 7 BED files (GC_0_20, GC_20_30, ..., GC_80_100) in `data/referenc
 
 # Prepare GENCODE CDS, GC, and Coverage stratification BEDs
 bash evaluation/prepare_stratification_hg38.sh
+
+# Prepare %GC in CDS Region strata (run this after prepare_stratification_hg38.sh)
+bash evaluation/prepare_cds_gc_stratification.sh
 
 # Download and filter ClinVar to chr22 pathogenic variants
 bash evaluation/prepare_clinvar.sh
@@ -221,8 +216,6 @@ done
 
 ## 4. Shared Preprocessing
 
-The shared preprocessing BAM is the only valid input for Track A comparisons.
-
 ### 4.1 Alignment And Sort
 
 ```bash
@@ -300,11 +293,6 @@ Outputs:
 - Per-caller results: `results/eval/vcfeval/{COV}x/{caller}/` → `fn.vcf.gz`, `fp.vcf.gz`, `tp.vcf.gz`, `tp-baseline.vcf.gz`, `summary.txt`
 - Aggregated stats: `results/eval/vcfeval_all_stats.tsv`
 
-To run for specific callers only:
-
-```bash
-WGS_CALLERS="gatk deepvariant" bash evaluation/eval_vcfeval.sh
-```
 
 ### 6.2 Concordance Analysis
 
@@ -383,8 +371,8 @@ Rscript visualization/03_stratified_plots.R
 # 4. ClinVar Pathogenic Variant Detection Analysis
 Rscript visualization/04_clinvar_analysis.R
 
-# 5. UpSet Plots (render RMarkdown)
-Rscript -e "rmarkdown::render('visualization/upset-plot.Rmd')"
+# 5. UpSet Plots
+Rscript visualization/upset-plot.R
 ```
 
 ## 8. AlphaGenome Scoring
@@ -412,8 +400,6 @@ Output: `results/alphagenome/{caller}_{COV}x_{FN|FP}_variant_scores_tidy.csv`
 
 ## 9. Method Notes
 
-- Track A is the paper-grade benchmark because all callers receive the same dedup BAM.
-- The optional DNAscope FASTQ runs are useful to show Sentieon's end-to-end behavior, but they are not a fair caller-only comparison.
 - WGS coverages 10x/20x/30x/50x span the regime from low-depth research to production-grade sequencing, enabling depth-impact analysis.
 
 ## 10. Future Work
@@ -423,4 +409,3 @@ Planned but not implemented in this repo:
 - SnpEff / SnpSift annotation
 - dbNSFP / ClinVar integration
 - ACMG-style FN/FP risk summaries
-- AlphaGenome scoring
