@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import re
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Set
 
 import numpy as np
 import pandas as pd
@@ -29,6 +29,8 @@ CALLER_ALIAS_TO_CANONICAL = {
     "DS": "dnascope",
 }
 
+DEFAULT_PATTERN_PREFIXES = ["all_5", "single_caller", "dv_ds"]
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Merge AlphaGenome scores with downstream pattern tables")
@@ -36,7 +38,25 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--strata-dir", type=Path, default=Path("results/analysis/stratification"))
     p.add_argument("--alphagenome-dir", type=Path, default=Path("results/alphagenome"))
     p.add_argument("--out-dir", type=Path, default=Path("results/analysis/alphagenome"))
+    p.add_argument(
+        "--pattern-prefixes",
+        default=",".join(DEFAULT_PATTERN_PREFIXES),
+        help=(
+            "Comma-separated pattern prefixes to score (default: all_5,single_caller,dv_ds). "
+            "Set empty string to disable filtering."
+        ),
+    )
     return p.parse_args()
+
+
+def parse_pattern_prefixes(raw: str) -> Set[str]:
+    return {x.strip() for x in str(raw).split(",") if x.strip()}
+
+
+def pattern_matches(name: str, prefixes: Set[str]) -> bool:
+    if not prefixes:
+        return True
+    return any(name.startswith(f"{prefix}_") for prefix in prefixes)
 
 
 def normalize_variant_id(v: str) -> str:
@@ -138,14 +158,22 @@ def main() -> None:
     ag_dir = (root / args.alphagenome_dir).resolve()
     out_dir = (root / args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+    pattern_prefixes = parse_pattern_prefixes(args.pattern_prefixes)
 
     score_table = build_score_table(ag_dir)
     if score_table.empty:
         print(f"[WARN] No AlphaGenome score files found in {ag_dir}")
 
-    strata_files = sorted(strata_dir.glob("*_with_strata.tsv"))
+    strata_files = sorted(
+        p for p in strata_dir.glob("*_with_strata.tsv")
+        if pattern_matches(p.name.replace("_with_strata.tsv", ""), pattern_prefixes)
+    )
     if not strata_files:
-        print(f"[WARN] No strata files found in {strata_dir}")
+        if pattern_prefixes:
+            pref = ",".join(sorted(pattern_prefixes))
+            print(f"[WARN] No matching strata files found in {strata_dir} for prefixes: {pref}")
+        else:
+            print(f"[WARN] No strata files found in {strata_dir}")
         return
 
     summary_rows: List[Dict[str, object]] = []
@@ -164,6 +192,13 @@ def main() -> None:
 
         if "pattern" not in df.columns:
             raise ValueError(f"Missing pattern column in {sf}")
+
+        if pattern_prefixes:
+            mask = df["pattern"].astype(str).map(lambda x: pattern_matches(x, pattern_prefixes))
+            if not bool(mask.any()):
+                print(f"[INFO] Skip {sf.name}: no rows matched --pattern-prefixes")
+                continue
+            df = df.loc[mask].copy()
 
         df["coverage"] = coverage
         df["error_type"] = np.where(df["pattern"].str.endswith("_fn"), "FN", "FP")
