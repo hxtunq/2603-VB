@@ -24,7 +24,7 @@ args <- commandArgs(trailingOnly = TRUE)
 
 # Try to find stats file: prefer hap.py output (has SNP/INDEL breakdown)
 find_stats_file <- function() {
-  project_dir <- normalizePath(file.path(dirname(sys.frame(1)$ofile %||% "."), ".."), mustWork = FALSE)
+  project_dir <- if (file.exists("workflow.md") || dir.exists("visualization")) "." else ".."
   candidates <- c(
     file.path(project_dir, "results", "eval", "all_stats.tsv"),          # hap.py output
     file.path(project_dir, "results", "eval", "vcfeval_all_stats.tsv")   # vcfeval output

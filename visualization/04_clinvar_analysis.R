@@ -21,7 +21,7 @@ suppressPackageStartupMessages({
 # ── Command-line args ──
 args <- commandArgs(trailingOnly = TRUE)
 
-project_dir <- normalizePath(file.path(dirname(sys.frame(1)$ofile %||% "."), ".."), mustWork = FALSE)
+project_dir <- if (file.exists("workflow.md") || dir.exists("visualization")) "." else ".."
 
 stats_file <- if (length(args) >= 1) args[1] else file.path(project_dir, "results", "eval", "all_stats.tsv")
 output_dir <- if (length(args) >= 2) args[2] else file.path(project_dir, "results", "plots")

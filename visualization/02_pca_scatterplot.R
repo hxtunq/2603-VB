@@ -23,7 +23,7 @@ suppressPackageStartupMessages({
 # ── Command-line args ──
 args <- commandArgs(trailingOnly = TRUE)
 
-project_dir <- normalizePath(file.path(dirname(sys.frame(1)$ofile %||% "."), ".."), mustWork = FALSE)
+project_dir <- if (file.exists("workflow.md") || dir.exists("visualization")) "." else ".."
 vcfeval_dir <- file.path(project_dir, "results", "eval", "vcfeval")
 
 # Find all concordance files or use specified one
