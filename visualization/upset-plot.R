@@ -6,7 +6,11 @@ library(data.table)
 # Configuration
 
 # Project paths — adjust if running from different directory
-project_dir <- normalizePath(file.path(getwd(), ".."), mustWork = FALSE)
+if (dir.exists(file.path(getwd(), "results"))) {
+  project_dir <- getwd()
+} else {
+  project_dir <- normalizePath(file.path(getwd(), ".."), mustWork = FALSE)
+}
 vcfeval_dir <- file.path(project_dir, "results", "eval", "vcfeval")
 output_dir  <- file.path(project_dir, "results", "plots")
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
