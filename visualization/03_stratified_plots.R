@@ -335,5 +335,59 @@ cat("\n--- Assembling combined stratification figure ---\n")
 all_saved <- list.files(output_dir, pattern = "lineplot_.*\\.pdf$")
 cat("  Line plots generated:", length(all_saved), "\n")
 
+# =============================================================================
+# PLOT 6: F1 by %GC in CDS Region (Line Plot)
+# =============================================================================
+
+cat("\n--- Plot 6: F1 by %GC in CDS Region ---\n")
+
+# Detect CDS_GC strata from Subset names: CDS_GC_0_20, CDS_GC_20_30, etc.
+cds_gc_range <- str_match(bdata$Subset, "CDS_GC_(\\d+)_(\\d+)")
+bdata$cds_gc_pct <- ifelse(!is.na(cds_gc_range[, 2]),
+                        (as.numeric(cds_gc_range[, 2]) + as.numeric(cds_gc_range[, 3])) / 2,
+                        NA)
+
+by_cds_gc <- bdata %>%
+  filter(!is.na(cds_gc_pct),
+         Filter == "PASS", Subtype == "*",
+         TRUTH.TOTAL > 5) %>%
+  filter(!is.na(F1))
+
+if (nrow(by_cds_gc) > 0) {
+  cds_gc_aggr <- by_cds_gc %>%
+    group_by(Type, Caller, cds_gc_pct) %>%
+    summarise(
+      F1_mean = mean(F1, na.rm = TRUE),
+      F1_se = sd(F1, na.rm = TRUE) / sqrt(n()),
+      .groups = "drop"
+    )
+
+  for (vtype in unique(cds_gc_aggr$Type)) {
+    sub_df <- cds_gc_aggr %>% filter(Type == vtype)
+    if (nrow(sub_df) == 0) next
+
+    p_cds_gc <- ggplot(sub_df, aes(x = cds_gc_pct, y = F1_mean, color = Caller)) +
+      geom_line(linewidth = 1) +
+      geom_point(size = 2.5) +
+      scale_color_manual(values = caller_colors) +
+      scale_y_continuous(limits = c(0, 1)) +
+      scale_x_continuous(limits = c(0, 100)) +
+      labs(title = paste("%GC in CDS region —", vtype),
+           x = "%GC in CDS region", y = "F1 Score") +
+      theme_bw(base_size = 13) +
+      theme(panel.grid.minor = element_blank(),
+            plot.title = element_text(hjust = 0.5, face = "bold"),
+            legend.position = "bottom")
+
+    fname <- paste0("lineplot_f1_by_cds_gc_", tolower(vtype))
+    ggsave(file.path(output_dir, paste0(fname, ".pdf")), p_cds_gc, width = 8, height = 6)
+    ggsave(file.path(output_dir, paste0(fname, ".png")), p_cds_gc, width = 8, height = 6, dpi = 150)
+    cat("  Saved:", fname, "\n")
+  }
+} else {
+  cat("  SKIP: No CDS_GC stratification data found in Subset column\n")
+}
+
 cat("\n✓ Stratified plots complete.\n")
 cat("  Output directory:", output_dir, "\n")
+
