@@ -113,6 +113,8 @@ for (cov in coverages) {
       ifelse(is.finite(med_all5), med_all5, NA_real_)
     )
 
+    fp_main_label <- sprintf("FP intersection size (%s) | %s", cov, sub_txt)
+
     pdf(file.path(out_dir, sprintf("downstream_upset_fp_%s.pdf", cov)), width = 11, height = 8)
     upset(
       as.data.frame(x$mat),
@@ -122,10 +124,9 @@ for (cov in coverages) {
       keep.order = TRUE,
       main.bar.color = "#CC5A32",
       sets.bar.color = "#3870A0",
-      mainbar.y.label = sprintf("FP intersection size (%s)", cov),
+      mainbar.y.label = fp_main_label,
       sets.x.label = "FP per caller"
     )
-    title(sub = sub_txt, cex.sub = 0.8)
     dev.off()
 
     png(file.path(out_dir, sprintf("downstream_upset_fp_%s.png", cov)), width = 1400, height = 1000, res = 140)
@@ -137,10 +138,9 @@ for (cov in coverages) {
       keep.order = TRUE,
       main.bar.color = "#CC5A32",
       sets.bar.color = "#3870A0",
-      mainbar.y.label = sprintf("FP intersection size (%s)", cov),
+      mainbar.y.label = fp_main_label,
       sets.x.label = "FP per caller"
     )
-    title(sub = sub_txt, cex.sub = 0.8)
     dev.off()
   }
 
@@ -160,6 +160,8 @@ for (cov in coverages) {
       ifelse(is.finite(med_all5), med_all5, NA_real_)
     )
 
+    fn_main_label <- sprintf("FN intersection size (%s) | %s", cov, sub_txt)
+
     pdf(file.path(out_dir, sprintf("downstream_upset_fn_%s.pdf", cov)), width = 11, height = 8)
     upset(
       as.data.frame(x$mat),
@@ -169,10 +171,9 @@ for (cov in coverages) {
       keep.order = TRUE,
       main.bar.color = "#325A9A",
       sets.bar.color = "#2D8A6E",
-      mainbar.y.label = sprintf("FN intersection size (%s)", cov),
+      mainbar.y.label = fn_main_label,
       sets.x.label = "FN per caller"
     )
-    title(sub = sub_txt, cex.sub = 0.8)
     dev.off()
 
     png(file.path(out_dir, sprintf("downstream_upset_fn_%s.png", cov)), width = 1400, height = 1000, res = 140)
@@ -184,10 +185,9 @@ for (cov in coverages) {
       keep.order = TRUE,
       main.bar.color = "#325A9A",
       sets.bar.color = "#2D8A6E",
-      mainbar.y.label = sprintf("FN intersection size (%s)", cov),
+      mainbar.y.label = fn_main_label,
       sets.x.label = "FN per caller"
     )
-    title(sub = sub_txt, cex.sub = 0.8)
     dev.off()
   }
 }
