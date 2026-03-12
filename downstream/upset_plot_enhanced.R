@@ -15,9 +15,32 @@ scored_dir <- file.path(project_dir, "results", "analysis", "alphagenome")
 out_dir <- file.path(project_dir, "results", "plots", "downstream")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-if (!dir.exists(vcfeval_dir)) {
-  stop(sprintf("Missing directory: %s", vcfeval_dir))
+discover_concordance_dir <- function(project_dir, preferred_dir) {
+  if (dir.exists(preferred_dir)) {
+    hits <- list.files(preferred_dir, pattern = "^upset_long_callset_\\d+x\\.csv$", full.names = TRUE)
+    if (length(hits) > 0) return(preferred_dir)
+  }
+
+  candidates <- c(
+    file.path(project_dir, "results", "eval", "concordance"),
+    file.path(project_dir, "results", "eval", "vcfeval"),
+    file.path(project_dir, "results", "eval")
+  )
+
+  for (cand in candidates) {
+    if (!dir.exists(cand)) next
+    hits <- list.files(cand, pattern = "^upset_long_callset_\\d+x\\.csv$", full.names = TRUE, recursive = TRUE)
+    if (length(hits) > 0) {
+      # Use the directory that contains most matching files.
+      dtab <- sort(table(dirname(hits)), decreasing = TRUE)
+      return(names(dtab)[1])
+    }
+  }
+
+  return(preferred_dir)
 }
+
+vcfeval_dir <- discover_concordance_dir(project_dir, vcfeval_dir)
 
 caller_order <- c("HC", "DV", "ST", "FB", "DS")
 
@@ -53,8 +76,13 @@ coverage_files <- list.files(vcfeval_dir, pattern = "^upset_long_callset_\\d+x\\
 coverages <- sort(unique(gsub("^upset_long_callset_(\\d+x)\\.csv$", "\\1", coverage_files)))
 
 if (length(coverages) == 0) {
-  stop("No upset_long_callset_<cov>x.csv files found")
+  stop(sprintf(
+    "No upset_long_callset_<cov>x.csv files found. Looked in: %s\nTip: run downstream/build_concordance_from_vcfs.py first, or pass concordance dir as arg2.",
+    vcfeval_dir
+  ))
 }
+
+cat(sprintf("[INFO] Using concordance dir: %s\n", vcfeval_dir))
 
 for (cov in coverages) {
   fp_file <- file.path(vcfeval_dir, sprintf("upset_long_callset_%s.csv", cov))
