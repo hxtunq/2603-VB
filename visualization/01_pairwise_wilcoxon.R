@@ -58,8 +58,17 @@ if (is_happy) {
   cat("Detected: hap.py format (with SNP/INDEL breakdown)\n\n")
 
   # Standardize column names
-  if ("Caller" %in% colnames(raw))       colnames(raw)[colnames(raw) == "Caller"] <- "CallerName"
-  if ("CallerAlias" %in% colnames(raw))  colnames(raw)[colnames(raw) == "CallerAlias"] <- "Caller"
+  if ("Caller" %in% colnames(raw) && !"CallerAlias" %in% colnames(raw)) {
+    alias_map <- c(gatk = "HC", deepvariant = "DV", strelka2 = "ST",
+                   freebayes = "FB", dnascope = "DS")
+    raw$CallerAlias <- sapply(raw$Caller, function(x) {
+      if (x %in% names(alias_map)) alias_map[[x]] else x
+    })
+  }
+  if ("CallerAlias" %in% colnames(raw)) {
+    raw$CallerName <- raw$Caller
+    raw$Caller <- raw$CallerAlias
+  }
   if ("METRIC.F1_Score" %in% colnames(raw)) colnames(raw)[colnames(raw) == "METRIC.F1_Score"] <- "F1"
   if ("METRIC.Precision" %in% colnames(raw)) colnames(raw)[colnames(raw) == "METRIC.Precision"] <- "Precision"
   if ("METRIC.Recall" %in% colnames(raw)) colnames(raw)[colnames(raw) == "METRIC.Recall"] <- "Recall"

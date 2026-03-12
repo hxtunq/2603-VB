@@ -274,8 +274,6 @@ done
 
 ## 5. Variant Calling
 
-### 5.1 Track A: Shared BAM
-
 ```bash
 # pwd: variant-calling-benchmark
 for COV in 10 20 30 50; do

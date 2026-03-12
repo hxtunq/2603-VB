@@ -71,6 +71,8 @@ for (conc_file in conc_files) {
 
   # Binary matrix: callers only
   call_mat <- as.matrix(conc[, caller_cols])
+  mode(call_mat) <- "numeric"
+  call_mat[is.na(call_mat)] <- 0
 
   # Count how many callers called each variant
   n_callers_called <- rowSums(call_mat)
