@@ -42,6 +42,67 @@ happy_prepare_query_vcf() {
     printf '%s\n' "${curr_vcf}"
 }
 
+happy_prepare_truth_vcf() {
+    local truth_prepared="${EVAL_DIR}/truth_prepared.vcf.gz"
+    local truth_tmp="${truth_prepared}.tmp"
+    local sample_count=0
+
+    # Ensure EVAL_DIR exists before making subdirectories
+    mkdir -p "$(dirname "${truth_prepared}")"
+
+    if [[ -s "${truth_prepared}" && -s "${truth_prepared}.tbi" && "${truth_prepared}" -nt "${TRUTH_VCF}" ]]; then
+        printf '%s\n' "${truth_prepared}"
+        return
+    fi
+
+    rm -f "${truth_tmp}" "${truth_tmp}.tbi"
+
+    sample_count=$(bcftools query -l "${TRUTH_VCF}" | awk 'NF {c++} END {print c+0}')
+
+    if (( sample_count > 0 )); then
+        echo "  [TRUTH] Input truth VCF has ${sample_count} sample(s); keeping only the first sample column." >&2
+        zcat "${TRUTH_VCF}" | awk 'BEGIN{OFS="\t"; ff=0; gt=0}
+          /^##fileformat=/ {ff=1; print; next}
+          /^##FORMAT=<ID=GT,/ {gt=1; print; next}
+          /^##/ {print; next}
+          /^#CHROM/ {
+            if(ff==0) print "##fileformat=VCFv4.2"
+            if(gt==0) print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">"
+            print $1,$2,$3,$4,$5,$6,$7,$8,"FORMAT","TRUTH"
+            next
+          }
+          {
+            if(NF < 10) {
+              printf "ERROR: expected FORMAT + sample columns at %s:%s but found %d fields\n", $1, $2, NF > "/dev/stderr"
+              exit 1
+            }
+            print $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
+          }
+        ' | bcftools norm -f "${REF_FASTA}" -m -both \
+          | bgzip -c > "${truth_tmp}"
+    else
+        echo "  [TRUTH] Input truth VCF is sites-only; adding GT=1/1 sample column." >&2
+        zcat "${TRUTH_VCF}" | awk 'BEGIN{OFS="\t"; ff=0}
+          /^##fileformat=/ {ff=1; print; next}
+          /^##/ {print; next}
+          /^#CHROM/ {
+            if(ff==0) print "##fileformat=VCFv4.2"
+            print "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">"
+            print $0,"FORMAT","TRUTH"
+            next
+          }
+          {print $0,"GT","1/1"}
+        ' | bcftools norm -f "${REF_FASTA}" -m -both \
+          | bgzip -c > "${truth_tmp}"
+    fi
+
+    tabix -f -p vcf "${truth_tmp}"
+    mv -f "${truth_tmp}" "${truth_prepared}"
+    mv -f "${truth_tmp}.tbi" "${truth_prepared}.tbi"
+    
+    printf '%s\n' "${truth_prepared}"
+}
+
 happy_cov_suffix() {
     local cov="$1"
     printf '%sx\n' "${cov}"
@@ -63,13 +124,16 @@ happy_make_comparison() {
 
     curr_vcf=$(happy_prepare_query_vcf "${curr_vcf}")
 
+    local truth_vcf
+    truth_vcf=$(happy_prepare_truth_vcf)
+
     if [[ -f "${STRATIFICATION_TSV}" ]]; then
         strat_args=(--stratification "/ref/$(basename "${STRATIFICATION_TSV}")")
     fi
 
     echo "Evaluating: ${caller_name} @ ${cov}x (${mode})"
     echo "  VCF: ${curr_vcf}"
-    echo "  Truth: ${TRUTH_VCF}"
+    echo "  Truth: ${truth_vcf}"
 
     docker run --rm \
         -v "$(cd "${RESULTS_DIR}" && pwd):/results:ro" \
@@ -78,7 +142,7 @@ happy_make_comparison() {
         -v "$(cd "${eval_out}" && pwd):/output" \
         "${HAPPY_IMAGE}" \
         /opt/hap.py/bin/hap.py \
-        "/data/simulated/${PREFIX}_truth.vcf.gz" \
+        "/results/eval/$(basename "${truth_vcf}")" \
         "/results/variants/${cov_suffix}/${caller_name}/$(basename "${curr_vcf}")" \
         -r "/ref/$(basename "${REF_FASTA}")" \
         -f "/ref/$(basename "${TRUTH_BED}")" \

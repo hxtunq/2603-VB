@@ -190,13 +190,6 @@ bcftools sort -Oz -o simulated/SIMULATED_SAMPLE_chr22_truth.vcf.gz
 tabix -p vcf simulated/SIMULATED_SAMPLE_chr22_truth.vcf.gz
 ```
 
-simuG produces sites-only VCFs (no FORMAT/SAMPLE columns). Because the simulation is haploid (ART reads come from one mutated genome copy), all callers will report GT=1/1. Run the fix script to add the sample column:
-
-```bash
-# pwd: variant-calling-benchmark
-bash evaluation/fix_truth_vcf.sh
-```
-
 ### 3.2 WGS FASTQs
 
 ```bash
@@ -294,28 +287,14 @@ for COV in 10 20 30 50; do
 done
 ```
 
-### 5.2 Optional: DNAscope From Raw FASTQ
+### 6.1 Main Track — RTG VCFeval and hap.py
 
-Optional end-to-end DNAscope from the simulated raw FASTQs:
-
-```bash
-# pwd: variant-calling-benchmark
-for COV in 10 20 30 50; do
-  bash pipelines/07_call_dnascope_fastq.sh "${COV}"
-done
-```
-
-These runs use their own alignment pipeline from FASTQ, so keep them separate from the main Track A ranking.
-
-## 6. Evaluation
-
-### 6.1 Main Track — RTG VCFeval
-
-Direct RTG vcfeval evaluation (no Docker needed). Runs all 5 callers × 4 coverages and produces FN/FP/TP VCFs + aggregated stats:
+Direct RTG vcfeval evaluation (no Docker needed) and hap.py evaluation (Docker required). Both evaluate all 5 callers × 4 coverages.
 
 ```bash
 # pwd: variant-calling-benchmark
 bash evaluation/eval_vcfeval.sh
+bash evaluation/eval_happy.sh    # Optional: run hap.py in parallel
 ```
 
 Outputs:
