@@ -44,16 +44,27 @@ vcfeval_dir <- discover_concordance_dir(project_dir, vcfeval_dir)
 
 caller_order <- c("HC", "DV", "ST", "FB", "DS")
 
-to_matrix <- function(dt) {
+to_matrix <- function(dt, all_sets = NULL) {
   dt <- unique(dt)
   mat <- dcast(dt, id ~ set, fun.aggregate = length, value.var = "set")
-  sets <- setdiff(names(mat), "id")
-  mat[, (sets) := lapply(.SD, function(x) as.integer(x > 0)), .SDcols = sets]
+  sets_present <- setdiff(names(mat), "id")
+  mat[, (sets_present) := lapply(.SD, function(x) as.integer(x > 0)), .SDcols = sets_present]
+
+  if (!is.null(all_sets) && length(all_sets) > 0) {
+    missing_sets <- setdiff(all_sets, names(mat))
+    if (length(missing_sets) > 0) {
+      mat[, (missing_sets) := 0L]
+    }
+    sets <- all_sets
+  } else {
+    sets <- sets_present
+  }
+
   list(mat = mat, sets = sets)
 }
 
 special_counts <- function(dt, sets) {
-  m <- to_matrix(dt)$mat
+  m <- to_matrix(dt, all_sets = sets)$mat
   if (nrow(m) == 0) {
     return(list(all5 = 0L, single = data.frame(caller = sets, n = 0L)))
   }
@@ -98,7 +109,7 @@ for (cov in coverages) {
   if (length(sets) < 2) next
 
   if (nrow(fp) > 0) {
-    x <- to_matrix(fp)
+    x <- to_matrix(fp, all_sets = sets)
     sp <- special_counts(fp, sets)
     med_all5 <- median_score_for("all_5_fp", cov)
 
@@ -145,7 +156,7 @@ for (cov in coverages) {
   }
 
   if (nrow(fn) > 0) {
-    x <- to_matrix(fn)
+    x <- to_matrix(fn, all_sets = sets)
     sp <- special_counts(fn, sets)
     med_all5 <- median_score_for("all_5_fn", cov)
 
