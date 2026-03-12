@@ -1,42 +1,67 @@
-# Downstream Run Quick
+# Downstream Run Quick (Ubuntu Bash)
 
-## 1) Chay nhanh tung buoc (PowerShell)
+## 0) Luu y ve input concordance
 
-    cd D:\Git-Page\variant-calling-benchmark
+Pipeline nay can file variant-level theo mau:
 
-    python downstream\extract_error_patterns.py --project-root .
-    python downstream\annotate_variants_strata.py --project-root .
+    variant_concordance_10x.tsv
+    variant_concordance_20x.tsv
+    variant_concordance_30x.tsv
+    variant_concordance_50x.tsv
 
-    # Neu chua chay AlphaGenome thi van co the chay buoc merge (se ra canh bao nhe)
-    python downstream\aggregate_alphagenome_scores.py --project-root .
+Va moi file phai co cot:
 
-    Rscript downstream\upset_plot_enhanced.R .
-    Rscript downstream\plot_strata_characterization.R .
-    Rscript downstream\analyze_coverage_sensitivity.R .
+    variant_id    truth    HC    DV    ST    FB    DS
 
-## 2) Neu muon chay AlphaGenome truoc khi merge
+Neu ban chi co `concordance_matrix.tsv` dang pairwise summary
+(`Coverage, CallerA, CallerB, Concordance`) thi KHONG du thong tin
+de trich all-5-FN/all-5-FP/single-caller-FNFP o muc bien the.
 
-    cd D:\Git-Page\variant-calling-benchmark
+## 1) Chay tung buoc (khong AlphaGenome)
 
-    # Dat API key
-    $env:ALPHAGENOME_API_KEY = "YOUR_KEY"
+    cd /home/hxt/phase-1/2603-VB
 
-    # Chay batch score cho 5 callers x 4 coverages x FN/FP
+        # Neu CHUA co variant_concordance_<cov>x.tsv, script se tu build tu tp/fp/fn
+        export CONCORDANCE_SEARCH_ROOT="results/eval"
+        export CONCORDANCE_DIR="results/eval/concordance"
+
+        python downstream/build_concordance_from_vcfs.py \
+            --project-root . \
+            --search-root "$CONCORDANCE_SEARCH_ROOT" \
+            --out-dir "$CONCORDANCE_DIR"
+
+    python downstream/extract_error_patterns.py --project-root . --vcfeval-dir "$CONCORDANCE_DIR"
+    python downstream/annotate_variants_strata.py --project-root .
+    python downstream/aggregate_alphagenome_scores.py --project-root .
+
+    Rscript downstream/upset_plot_enhanced.R .
+    Rscript downstream/plot_strata_characterization.R .
+    Rscript downstream/analyze_coverage_sensitivity.R . "./$CONCORDANCE_DIR"
+
+## 2) Chay AlphaGenome roi merge
+
+    cd /home/hxt/phase-1/2603-VB
+    export ALPHAGENOME_API_KEY="YOUR_KEY"
+
     bash downstream/run_alphagenome_batch.sh
+    python downstream/aggregate_alphagenome_scores.py --project-root .
 
-    # Merge lai diem vao bang downstream
-    python downstream\aggregate_alphagenome_scores.py --project-root .
+## 3) All-in-one (khong AlphaGenome)
 
-## 3) Lenh all-in-one (khong chay AlphaGenome)
-
-    cd D:\Git-Page\variant-calling-benchmark
+    cd /home/hxt/phase-1/2603-VB
+    export CONCORDANCE_SEARCH_ROOT="results/eval"
+    export CONCORDANCE_DIR="results/eval/concordance"
+    export AUTO_BUILD_CONCORDANCE=1
     bash downstream/run_downstream_pipeline.sh
 
-## 4) Lenh all-in-one (co chay AlphaGenome)
+## 4) All-in-one (co AlphaGenome)
 
-    cd D:\Git-Page\variant-calling-benchmark
-    $env:ALPHAGENOME_API_KEY = "YOUR_KEY"
-    $env:RUN_ALPHAGENOME = "1"
+    cd /home/hxt/phase-1/2603-VB
+    export CONCORDANCE_SEARCH_ROOT="results/eval"
+    export CONCORDANCE_DIR="results/eval/concordance"
+    export AUTO_BUILD_CONCORDANCE=1
+    export ALPHAGENOME_API_KEY="YOUR_KEY"
+    export RUN_ALPHAGENOME=1
     bash downstream/run_downstream_pipeline.sh
 
 ## Output chinh

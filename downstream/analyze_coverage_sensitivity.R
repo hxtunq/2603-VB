@@ -9,8 +9,9 @@ suppressPackageStartupMessages({
 
 args <- commandArgs(trailingOnly = TRUE)
 project_dir <- ifelse(length(args) >= 1, args[[1]], getwd())
+concordance_dir <- ifelse(length(args) >= 2, args[[2]], file.path(project_dir, "results", "eval", "vcfeval"))
 
-vcfeval_dir <- file.path(project_dir, "results", "eval", "vcfeval")
+vcfeval_dir <- concordance_dir
 score_dir <- file.path(project_dir, "results", "analysis", "alphagenome")
 out_dir <- file.path(project_dir, "results", "plots", "downstream")
 out_tab <- file.path(project_dir, "results", "analysis", "summary_tables")

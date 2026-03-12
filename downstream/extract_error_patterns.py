@@ -31,7 +31,12 @@ DEFAULT_ALIAS = ["HC", "DV", "ST", "FB", "DS"]
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Extract FN/FP error patterns from concordance tables")
     p.add_argument("--project-root", type=Path, default=Path("."))
-    p.add_argument("--vcfeval-dir", type=Path, default=Path("results/eval/vcfeval"))
+    p.add_argument(
+        "--vcfeval-dir",
+        type=Path,
+        default=Path("results/eval/vcfeval"),
+        help="Directory containing variant_concordance_<cov>x.tsv files",
+    )
     p.add_argument("--out-dir", type=Path, default=Path("results/analysis/error_patterns"))
     p.add_argument("--coverages", default="10,20,30,50", help="Comma-separated coverages, e.g. 10,20,30,50")
     p.add_argument("--callers", default=",".join(DEFAULT_ALIAS), help="Caller alias columns in concordance table")
@@ -130,6 +135,12 @@ def main() -> None:
         df = pd.read_csv(concordance, sep="\t")
         missing = {"variant_id", "truth"} - set(df.columns)
         if missing:
+            if {"Coverage", "CallerA", "CallerB", "Concordance"}.issubset(df.columns):
+                raise ValueError(
+                    "Detected pairwise concordance summary table, not variant-level concordance. "
+                    "This pipeline requires files like variant_concordance_10x.tsv with columns: "
+                    "variant_id, truth, HC, DV, ST, FB, DS."
+                )
             raise ValueError(f"Missing required columns {missing} in {concordance}")
 
         caller_cols = [c for c in preferred_callers if c in df.columns]
