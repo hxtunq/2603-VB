@@ -1,0 +1,237 @@
+library(tidyverse)
+library(ComplexHeatmap)
+library(UpSetR)
+library(data.table)
+
+# Configuration
+
+# Project paths — adjust if running from different directory
+project_dir <- normalizePath(file.path(getwd(), ".."), mustWork = FALSE)
+vcfeval_dir <- file.path(project_dir, "results", "eval", "vcfeval")
+output_dir  <- file.path(project_dir, "results", "plots")
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Available coverages
+coverages <- list.files(vcfeval_dir, pattern = "upset_long_callset_",
+                        full.names = FALSE) %>%
+  str_extract("\\d+x") %>% na.omit() %>% unique() %>% sort()
+
+cat("Available coverages:", paste(coverages, collapse = ", "), "\n")
+
+# Caller aliases and colors
+caller_colors <- c(HC = "#E64B35", DV = "#4DBBD5", ST = "#00A087",
+                   FB = "#3C5488", DS = "#F39B7F")
+
+
+# Helper functions
+
+# Convert long-format CSV to binary matrix for UpSetR
+to_matrix <- function(dt) {
+  dt <- unique(dt)
+  mat <- dcast(dt, id ~ set, fun.aggregate = length, value.var = "set")
+  sets <- setdiff(names(mat), "id")
+  mat[, (sets) := lapply(.SD, function(x) as.integer(x > 0)), .SDcols = sets]
+  list(mat = mat, sets = sets)
+}
+
+# Count unique calls (FP by only 1 caller) and unique non-calls (FN by only 1 caller)
+count_unique <- function(dt, n_callers) {
+  dt <- unique(dt)
+  mat <- dcast(dt, id ~ set, fun.aggregate = length, value.var = "set")
+  sets <- setdiff(names(mat), "id")
+  mat[, (sets) := lapply(.SD, function(x) as.integer(x > 0)), .SDcols = sets]
+
+  # called = number of callers reporting this variant
+  mat[, n_reported := rowSums(.SD), .SDcols = sets]
+
+  # Unique calls: only 1 caller reported
+  unique_calls <- mat[n_reported == 1]
+
+  # Count per caller
+  result <- data.frame(Caller = sets, stringsAsFactors = FALSE)
+  result$unique_count <- sapply(sets, function(s) sum(unique_calls[[s]] == 1))
+
+  return(result)
+}
+
+
+# UpSet Plots per Coverage
+
+for (cov in coverages) {
+  cat("\n\n## Coverage:", cov, "\n\n")
+
+  # ── Read FP (callset) data ──
+  fp_file <- file.path(vcfeval_dir, paste0("upset_long_callset_", cov, ".csv"))
+  fn_file <- file.path(vcfeval_dir, paste0("upset_long_baseline_", cov, ".csv"))
+
+  if (!file.exists(fp_file)) {
+    cat("  SKIP: callset file not found\n")
+    next
+  }
+
+  callset_long <- fread(fp_file, header = FALSE, col.names = c("set", "id"))
+  baseline_long <- fread(fn_file, header = FALSE, col.names = c("set", "id"))
+
+  callers_found <- unique(c(callset_long$set, baseline_long$set))
+  n_callers <- length(callers_found)
+
+  cat("  Callers:", paste(callers_found, collapse = ", "), "\n")
+  cat("  FP variants:", length(unique(callset_long$id)), "\n")
+  cat("  FN variants:", length(unique(baseline_long$id)), "\n\n")
+
+  # ── UpSet: False Positives ──
+  if (nrow(callset_long) > 0) {
+    x1 <- to_matrix(callset_long)
+    cat("### False Positives (FP) — ", cov, "\n\n")
+    
+    # Save UpSet plot for FP to PDF
+    pdf(file.path(output_dir, paste0("upset_fp_", cov, ".pdf")), width = 10, height = 7)
+    print(
+      upset(as.data.frame(x1$mat), sets = x1$sets, order.by = "freq",
+            nintersects = 40, text.scale = 1.3,
+            main.bar.color = "#E64B35",
+            sets.bar.color = "#4DBBD5",
+            mainbar.y.label = "Intersection Size (FP)",
+            sets.x.label = "FP per Caller")
+    )
+    dev.off()
+    
+    # Save UpSet plot for FP to PNG
+    png(file.path(output_dir, paste0("upset_fp_", cov, ".png")), width = 10, height = 7, units = "in", res = 150)
+    print(
+      upset(as.data.frame(x1$mat), sets = x1$sets, order.by = "freq",
+            nintersects = 40, text.scale = 1.3,
+            main.bar.color = "#E64B35",
+            sets.bar.color = "#4DBBD5",
+            mainbar.y.label = "Intersection Size (FP)",
+            sets.x.label = "FP per Caller")
+    )
+    dev.off()
+    cat("  Saved UpSet FP plots for coverage", cov, "\n")
+  }
+
+  # ── UpSet: False Negatives ──
+  if (nrow(baseline_long) > 0) {
+    x2 <- to_matrix(baseline_long)
+    cat("\n\n### False Negatives (FN) — ", cov, "\n\n")
+    
+    # Save UpSet plot for FN to PDF
+    pdf(file.path(output_dir, paste0("upset_fn_", cov, ".pdf")), width = 10, height = 7)
+    print(
+      upset(as.data.frame(x2$mat), sets = x2$sets, order.by = "freq",
+            nintersects = 40, text.scale = 1.3,
+            main.bar.color = "#3C5488",
+            sets.bar.color = "#00A087",
+            mainbar.y.label = "Intersection Size (FN)",
+            sets.x.label = "FN per Caller")
+    )
+    dev.off()
+    
+    # Save UpSet plot for FN to PNG
+    png(file.path(output_dir, paste0("upset_fn_", cov, ".png")), width = 10, height = 7, units = "in", res = 150)
+    print(
+      upset(as.data.frame(x2$mat), sets = x2$sets, order.by = "freq",
+            nintersects = 40, text.scale = 1.3,
+            main.bar.color = "#3C5488",
+            sets.bar.color = "#00A087",
+            mainbar.y.label = "Intersection Size (FN)",
+            sets.x.label = "FN per Caller")
+    )
+    dev.off()
+    cat("  Saved UpSet FN plots for coverage", cov, "\n")
+  }
+}
+
+
+# Unique Calls and Non-Calls Summary
+
+all_unique_fp <- list()
+all_unique_fn <- list()
+
+for (cov in coverages) {
+  fp_file <- file.path(vcfeval_dir, paste0("upset_long_callset_", cov, ".csv"))
+  fn_file <- file.path(vcfeval_dir, paste0("upset_long_baseline_", cov, ".csv"))
+
+  if (!file.exists(fp_file)) next
+
+  callset_long <- fread(fp_file, header = FALSE, col.names = c("set", "id"))
+  baseline_long <- fread(fn_file, header = FALSE, col.names = c("set", "id"))
+
+  callers_found <- unique(c(callset_long$set, baseline_long$set))
+
+  # Unique FP: variants only 1 caller reported as FP
+  if (nrow(callset_long) > 0) {
+    uc <- count_unique(callset_long, length(callers_found))
+    uc$Coverage <- cov
+    uc$Type <- "Unique FP Calls"
+    all_unique_fp[[cov]] <- uc
+  }
+
+  # Unique FN: variants only 1 caller missed
+  if (nrow(baseline_long) > 0) {
+    unc <- count_unique(baseline_long, length(callers_found))
+    unc$Coverage <- cov
+    unc$Type <- "Unique FN (Non-Calls)"
+    all_unique_fn[[cov]] <- unc
+  }
+}
+
+unique_df <- bind_rows(c(all_unique_fp, all_unique_fn))
+
+if (nrow(unique_df) > 0) {
+  cat("### Unique Calls / Non-Calls Summary\n\n")
+  print(unique_df %>% arrange(Type, Coverage, Caller))
+
+  p <- ggplot(unique_df, aes(x = Caller, y = unique_count, fill = Caller)) +
+    geom_bar(stat = "identity", color = "black", linewidth = 0.3) +
+    scale_fill_manual(values = caller_colors) +
+    facet_grid(Type ~ Coverage, scales = "free_y") +
+    labs(title = "Unique Calls (FP only by 1 caller) & Unique Non-Calls (FN only by 1 caller)",
+         x = "", y = "Count") +
+    theme_bw(base_size = 12) +
+    theme(panel.grid.minor = element_blank(),
+          plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none",
+          axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"))
+
+  print(p)
+
+  ggsave(file.path(output_dir, "unique_calls_noncalls.pdf"), p, width = 10, height = 7)
+  ggsave(file.path(output_dir, "unique_calls_noncalls.png"), p, width = 10, height = 7, dpi = 150)
+  cat("\nSaved: unique_calls_noncalls.pdf/png\n")
+}
+
+# Concordance Overview: Number of Callers per Variant
+
+for (cov in coverages) {
+  conc_file <- file.path(vcfeval_dir, paste0("variant_concordance_", cov, ".tsv"))
+  if (!file.exists(conc_file)) next
+
+  conc <- fread(conc_file)
+  caller_cols <- setdiff(names(conc), c("variant_id", "truth"))
+  conc[, n_called := rowSums(.SD), .SDcols = caller_cols]
+  conc[, status := ifelse(truth == 1 & n_called > 0, "TP",
+                    ifelse(truth == 1 & n_called == 0, "FN",
+                     ifelse(truth == 0 & n_called > 0, "FP", "TN")))]
+
+  plot_df <- conc[status %in% c("FN", "FP"), .(variant_id, n_called, status)]
+
+  if (nrow(plot_df) > 0) {
+    p <- ggplot(plot_df, aes(x = status, y = n_called, fill = status)) +
+      geom_violin(scale = "width", alpha = 0.8) +
+      geom_boxplot(width = 0.15, fill = "white", outlier.shape = NA) +
+      scale_fill_manual(values = c(FN = "#3C5488", FP = "#E64B35")) +
+      scale_y_continuous(breaks = 0:length(caller_cols)) +
+      labs(title = paste("Number of Callers Reporting FN/FP Variants —", cov),
+           x = "", y = "Number of Callers") +
+      theme_bw(base_size = 13) +
+      theme(panel.grid.minor = element_blank(),
+            plot.title = element_text(hjust = 0.5, face = "bold"),
+            legend.position = "none")
+
+    print(p)
+
+    ggsave(file.path(output_dir, paste0("violin_fn_fp_", cov, ".pdf")), p, width = 6, height = 5)
+    ggsave(file.path(output_dir, paste0("violin_fn_fp_", cov, ".png")), p, width = 6, height = 5, dpi = 150)
+  }
+}
