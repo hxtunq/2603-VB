@@ -5,6 +5,7 @@ Inputs:
 - results/analysis/error_patterns/*.tsv
 - data/reference/gc_strata/*.bed (GC and CDS_GC bins)
 - optional CDS canonical BED
+- data/reference/repeats/*.bed (tandem repeat, mappability, segdup)
 
 Outputs:
 - results/analysis/stratification/*_with_strata.tsv
@@ -37,6 +38,12 @@ def parse_args() -> argparse.Namespace:
         help="CDS canonical BED; if missing, in_cds_canonical will be NA",
     )
     p.add_argument("--out-dir", type=Path, default=Path("results/analysis/stratification"))
+    p.add_argument(
+        "--repeats-dir",
+        type=Path,
+        default=Path("data/reference/repeats"),
+        help="Directory with GIAB repeat/mappability/segdup BEDs",
+    )
     return p.parse_args()
 
 
@@ -129,6 +136,7 @@ def main() -> None:
     patterns_dir = (root / args.patterns_dir).resolve()
     gc_dir = (root / args.gc_dir).resolve()
     cds_bed = (root / args.cds_bed).resolve()
+    repeats_dir = (root / args.repeats_dir).resolve()
     out_dir = (root / args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -138,6 +146,11 @@ def main() -> None:
         gc_map = merge_interval_maps(gc_map, load_bed(bed, label))
 
     cds_map = load_bed(cds_bed, "CDS_CANONICAL")
+
+    # GIAB repeat / mappability / segdup BEDs
+    tandem_map = load_bed(repeats_dir / "tandem_repeat_homopolymer.bed", "tandem_repeat")
+    lowmapq_map = load_bed(repeats_dir / "low_mappability.bed", "low_mapq")
+    segdup_map = load_bed(repeats_dir / "segdup.bed", "segdup")
 
     files = [
         p for p in sorted(patterns_dir.glob("*.tsv"))
@@ -163,6 +176,9 @@ def main() -> None:
         gc_bins = []
         cds_gc_bins = []
         in_cds = []
+        in_tandem = []
+        in_lowmapq = []
+        in_segdup = []
 
         for vid in df["variant_id"].astype(str):
             c, p, r, a = parse_variant_id(vid)
@@ -181,6 +197,10 @@ def main() -> None:
             cds_labels = overlap_labels(cds_map.get(c, []), pos0)
             in_cds.append(1 if cds_labels else 0)
 
+            in_tandem.append(1 if overlap_labels(tandem_map.get(c, []), pos0) else 0)
+            in_lowmapq.append(1 if overlap_labels(lowmapq_map.get(c, []), pos0) else 0)
+            in_segdup.append(1 if overlap_labels(segdup_map.get(c, []), pos0) else 0)
+
         out = df.copy()
         out["chrom"] = chroms
         out["pos"] = pos
@@ -192,6 +212,9 @@ def main() -> None:
         out["in_cds_canonical"] = in_cds
         # Protein coding fallback: use CDS canonical when no separate BED is provided.
         out["in_protein_coding"] = in_cds
+        out["in_tandem_repeat"] = in_tandem
+        out["in_low_mapq"] = in_lowmapq
+        out["in_segdup"] = in_segdup
 
         out_file = out_dir / path.name.replace(".tsv", "_with_strata.tsv")
         out.to_csv(out_file, sep="\t", index=False)
@@ -206,6 +229,9 @@ def main() -> None:
                 "coverage": coverage,
                 "n_variants": int(len(out)),
                 "n_in_cds": int(out["in_cds_canonical"].sum()),
+                "n_in_tandem_repeat": int(out["in_tandem_repeat"].sum()),
+                "n_in_low_mapq": int(out["in_low_mapq"].sum()),
+                "n_in_segdup": int(out["in_segdup"].sum()),
                 "median_gc_pct_mid": float(out["gc_pct_mid"].median(skipna=True)),
             }
         )

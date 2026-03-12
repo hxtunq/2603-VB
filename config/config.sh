@@ -102,6 +102,9 @@ export TRUTH_BED="${REF_DIR}/${CHR_TO_USE}_highconf.bed"
 # Stratification TSV for hap.py (list of BED files)
 export STRATIFICATION_TSV="${REF_DIR}/stratification_chr22.tsv"
 
+# GIAB repeat / mappability / segdup strata
+export REPEATS_DIR="${REF_DIR}/repeats"
+
 #-------------------------------------------------------------------------------
 # TOOL VERSIONS
 #-------------------------------------------------------------------------------

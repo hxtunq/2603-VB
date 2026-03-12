@@ -237,6 +237,15 @@ done
 echo "  Written: ${STRAT_TSV}"
 echo "  Entries: $(wc -l < "${STRAT_TSV}")"
 
+# =============================================================================
+# 4) GIAB repeat / mappability / segdup strata
+# =============================================================================
+
+echo ""
+echo "--- Step 4: GIAB repeat/mappability/segdup strata ---"
+
+bash "${SCRIPT_DIR}/prepare_giab_strata.sh"
+
 echo ""
 echo "=========================================="
 echo " Stratification preparation complete"

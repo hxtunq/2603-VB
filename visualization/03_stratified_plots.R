@@ -389,5 +389,142 @@ if (nrow(by_cds_gc) > 0) {
 }
 
 cat("\n✓ Stratified plots complete.\n")
+cat("  Output directory:", output_dir, "\n\n")
+
+# =============================================================================
+# PLOTS 7–8: Genomic Context Analysis (from downstream strata annotation)
+#
+# Reads *_with_strata.tsv files produced by annotate_variants_strata.py
+# and generates:
+#   - Heatmap: Caller × Genomic Region → error proportion
+#   - Bar chart: Error counts per region, grouped by caller
+# =============================================================================
+
+cat("--- Plots 7-8: Genomic Context Heatmap + Bar ---\n")
+
+strata_dir <- file.path(project_dir, "results", "analysis", "stratification")
+strata_files <- list.files(strata_dir, pattern = "_with_strata\\.tsv$", full.names = TRUE)
+
+if (length(strata_files) > 0) {
+
+  strata_all <- do.call(rbind, lapply(strata_files, function(f) {
+    read.delim(f, sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+  }))
+  cat("  Loaded", nrow(strata_all), "annotated variants from", length(strata_files), "files\n")
+
+  # Identify FP vs FN from pattern column
+  strata_all$error_type <- case_when(
+    grepl("_fp$", strata_all$pattern) ~ "FP",
+    grepl("_fn$", strata_all$pattern) ~ "FN",
+    TRUE ~ NA_character_
+  )
+  strata_all <- strata_all %>% filter(!is.na(error_type))
+
+  # Identify which caller(s) are responsible for each error
+  caller_cols <- c("HC", "DV", "ST", "FB", "DS")
+  caller_cols <- caller_cols[caller_cols %in% colnames(strata_all)]
+
+  # Region flag columns to analyze
+  region_cols <- c("in_cds_canonical", "in_tandem_repeat", "in_low_mapq", "in_segdup")
+  region_cols <- region_cols[region_cols %in% colnames(strata_all)]
+
+  region_labels <- c(
+    in_cds_canonical = "CDS Canonical",
+    in_tandem_repeat = "Tandem Repeat / Homopolymer",
+    in_low_mapq      = "Low Mappability",
+    in_segdup         = "Segmental Duplication"
+  )
+
+  if (length(caller_cols) > 0 && length(region_cols) > 0) {
+
+    # Build long-form: one row per (variant × caller × region)
+    # For FP: caller called it (caller_col == 1 when truth == 0)
+    # For FN: caller missed it (caller_col == 0 when truth == 1)
+    heat_rows <- list()
+    for (cc in caller_cols) {
+      for (rc in region_cols) {
+        for (et in c("FP", "FN")) {
+          sub <- strata_all %>% filter(error_type == et)
+          if (nrow(sub) == 0) next
+
+          if (et == "FP") {
+            # Caller is responsible if it called the variant (== 1) while truth == 0
+            responsible <- sub[[cc]] == 1
+          } else {
+            # Caller is responsible if it missed the variant (== 0) while truth == 1
+            responsible <- sub[[cc]] == 0
+          }
+
+          n_total <- sum(responsible)
+          n_in_region <- sum(responsible & sub[[rc]] == 1)
+          pct <- if (n_total > 0) n_in_region / n_total * 100 else NA_real_
+
+          heat_rows[[length(heat_rows) + 1]] <- data.frame(
+            Caller = cc,
+            Region = region_labels[[rc]],
+            ErrorType = et,
+            n_errors = n_total,
+            n_in_region = n_in_region,
+            pct_in_region = pct,
+            stringsAsFactors = FALSE
+          )
+        }
+      }
+    }
+    heat_df <- do.call(rbind, heat_rows)
+    heat_df$Caller <- factor(heat_df$Caller, levels = caller_order)
+
+    # ── Plot 7: Heatmap ──
+    p_heat <- ggplot(heat_df %>% filter(!is.na(pct_in_region)),
+                     aes(x = Caller, y = Region, fill = pct_in_region)) +
+      geom_tile(color = "white", linewidth = 0.8) +
+      geom_text(aes(label = sprintf("%.1f%%\n(%d)", pct_in_region, n_in_region)),
+                size = 3, color = "black") +
+      facet_wrap(~ ErrorType) +
+      scale_fill_gradient(low = "white", high = "#E64B35", name = "% errors\nin region") +
+      labs(title = "Caller Error Distribution Across Genomic Regions",
+           x = "Variant Caller", y = "Genomic Region") +
+      theme_bw(base_size = 13) +
+      theme(panel.grid = element_blank(),
+            plot.title = element_text(hjust = 0.5, face = "bold"),
+            legend.position = "right",
+            strip.background = element_rect(fill = "#F0F0F0"),
+            strip.text = element_text(face = "bold"))
+
+    ggsave(file.path(output_dir, "heatmap_caller_vs_region.pdf"), p_heat, width = 11, height = 6)
+    ggsave(file.path(output_dir, "heatmap_caller_vs_region.png"), p_heat, width = 11, height = 6, dpi = 150)
+    cat("  Saved: heatmap_caller_vs_region\n")
+
+    # ── Plot 8: Bar chart — error counts per region per caller ──
+    bar_df <- heat_df %>% filter(n_in_region > 0)
+
+    if (nrow(bar_df) > 0) {
+      p_bar <- ggplot(bar_df, aes(x = Region, y = n_in_region, fill = Caller)) +
+        geom_col(position = position_dodge(0.8), width = 0.7, alpha = 0.9) +
+        facet_wrap(~ ErrorType, scales = "free_y") +
+        scale_fill_manual(values = caller_colors) +
+        labs(title = "Error Counts in Difficult Genomic Regions",
+             x = "Genomic Region", y = "Number of Errors") +
+        theme_bw(base_size = 13) +
+        theme(panel.grid.minor = element_blank(),
+              plot.title = element_text(hjust = 0.5, face = "bold"),
+              legend.position = "bottom",
+              axis.text.x = element_text(angle = 25, hjust = 1))
+
+      ggsave(file.path(output_dir, "bar_errors_by_region.pdf"), p_bar, width = 11, height = 6)
+      ggsave(file.path(output_dir, "bar_errors_by_region.png"), p_bar, width = 11, height = 6, dpi = 150)
+      cat("  Saved: bar_errors_by_region\n")
+    }
+
+  } else {
+    cat("  SKIP: Required columns not found in strata TSV files\n")
+  }
+
+} else {
+  cat("  SKIP: No *_with_strata.tsv files found in", strata_dir, "\n")
+  cat("  Run: python3 downstream/annotate_variants_strata.py first\n")
+}
+
+cat("\n✓ All stratified plots complete.\n")
 cat("  Output directory:", output_dir, "\n")
 
