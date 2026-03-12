@@ -122,6 +122,15 @@ def pattern_matches(name: str, prefixes: set[str]) -> bool:
     return any(name.startswith(f"{prefix}_") for prefix in prefixes)
 
 
+def infer_error_type_from_name(name: str) -> str:
+    lower = f"_{str(name).lower()}_"
+    if "_fn_" in lower:
+        return "FN"
+    if "_fp_" in lower:
+        return "FP"
+    return ""
+
+
 def load_target_variant_ids(
     root: Path,
     patterns_dir: Path,
@@ -139,7 +148,10 @@ def load_target_variant_ids(
         return set()
 
     out: set[str] = set()
-    files = [p for p in sorted(patt_dir.glob(f"*_{cov}x.tsv")) if pattern_matches(p.stem, pattern_prefixes)]
+    candidates = list(patt_dir.glob(f"*_{cov}x.tsv")) + list(
+        patt_dir.glob(f"*_{cov}x_with_strata.tsv")
+    )
+    files = [p for p in sorted(candidates) if pattern_matches(p.stem, pattern_prefixes)]
 
     for path in files:
         try:
@@ -150,13 +162,17 @@ def load_target_variant_ids(
         if df.empty or "variant_id" not in df.columns:
             continue
 
+        file_error_type = infer_error_type_from_name(path.stem)
+        if file_error_type and file_error_type != error_type.upper():
+            continue
+
         if "pattern" in df.columns:
             df = df[df["pattern"].astype(str).str.endswith(error_suffix)]
             if pattern_prefixes:
                 df = df[
                     df["pattern"].astype(str).map(lambda x: pattern_matches(x, pattern_prefixes))
                 ]
-        elif not path.stem.endswith(error_suffix):
+        elif not file_error_type:
             continue
 
         if df.empty:

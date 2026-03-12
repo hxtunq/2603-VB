@@ -17,7 +17,20 @@ SCORERS=${SCORERS:-"all"}
 BATCH_SIZE=${BATCH_SIZE:-50}
 SKIP_IF_EXISTS=${SKIP_IF_EXISTS:-1}
 PATTERN_PREFIXES=${PATTERN_PREFIXES:-"all_5,single_caller"}
-PATTERNS_DIR=${PATTERNS_DIR:-"results/analysis/error_patterns"}
+ALL5_ONLY=${ALL5_ONLY:-0}
+
+# Prefer stratified pattern tables when present.
+if [[ -z "${PATTERNS_DIR:-}" ]]; then
+  if [[ -d "${PROJECT_DIR}/results/analysis/stratification" ]]; then
+    PATTERNS_DIR="results/analysis/stratification"
+  else
+    PATTERNS_DIR="results/analysis/error_patterns"
+  fi
+fi
+
+if [[ "${ALL5_ONLY}" == "1" ]]; then
+  PATTERN_PREFIXES="all_5"
+fi
 
 OUT_DIR="${PROJECT_DIR}/results/alphagenome"
 mkdir -p "${OUT_DIR}"
@@ -33,6 +46,7 @@ echo "Project: ${PROJECT_DIR}"
 echo "Callers: ${CALLERS}"
 echo "Coverages: ${COVERAGES}"
 echo "Error types: ${ERROR_TYPES}"
+echo "ALL5 only: ${ALL5_ONLY}"
 echo "Pattern prefixes: ${PATTERN_PREFIXES:-<none>}"
 echo "Patterns dir: ${PATTERNS_DIR}"
 echo "Seq length: ${SEQUENCE_LENGTH}"
