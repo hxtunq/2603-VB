@@ -43,6 +43,11 @@ de trich all-5-FN/all-5-FP/single-caller-FNFP o muc bien the.
     cd /home/hxt/phase-1/2603-VB
     export ALPHAGENOME_API_KEY="YOUR_KEY"
 
+    # Mac dinh chi score bien the thuoc error patterns dac biet:
+    # all_5 + single_caller
+    # Muon them dv_ds: export PATTERN_PREFIXES="all_5,single_caller,dv_ds"
+    # Muon tat loc pattern (score tat ca): export PATTERN_PREFIXES=""
+
     bash downstream/run_alphagenome_batch.sh
     python downstream/aggregate_alphagenome_scores.py --project-root .
 

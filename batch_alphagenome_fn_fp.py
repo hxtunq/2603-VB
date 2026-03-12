@@ -46,6 +46,13 @@ from alphagenome.models import dna_client, variant_scorers
 
 # ── CLI ──────────────────────────────────────────────────────────────
 ALL_COVERAGES = [10, 20, 30, 50]
+CALLER_TO_ALIAS = {
+    "gatk": "HC",
+    "deepvariant": "DV",
+    "strelka2": "ST",
+    "freebayes": "FB",
+    "dnascope": "DS",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -73,6 +80,20 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--api-key-env", default="ALPHAGENOME_API_KEY")
     p.add_argument("--batch-size", type=int, default=50,
                    help="Number of variants to score per batch (lower = less RAM)")
+    p.add_argument(
+        "--patterns-dir",
+        type=Path,
+        default=Path("results/analysis/error_patterns"),
+        help="Directory containing extracted error pattern TSVs",
+    )
+    p.add_argument(
+        "--pattern-prefixes",
+        default="",
+        help=(
+            "Comma-separated error pattern prefixes to include (e.g. all_5,single_caller). "
+            "Empty means no pattern-based filtering."
+        ),
+    )
     p.add_argument("--no-parquet", action="store_true")
     return p.parse_args()
 
@@ -80,6 +101,89 @@ def parse_args() -> argparse.Namespace:
 # ── helpers ──────────────────────────────────────────────────────────
 def normalize_chrom(chrom: str) -> str:
     return chrom if chrom.startswith("chr") else f"chr{chrom}"
+
+
+def normalize_variant_id(v: str) -> str:
+    s = str(v)
+    if ">" in s and s.count(":") == 2:
+        chrom, pos, ra = s.split(":")
+        ref, alt = ra.split(">")
+        return f"{chrom}:{pos}:{ref}:{alt}"
+    return s
+
+
+def parse_pattern_prefixes(raw: str) -> set[str]:
+    return {x.strip() for x in str(raw).split(",") if x.strip()}
+
+
+def pattern_matches(name: str, prefixes: set[str]) -> bool:
+    if not prefixes:
+        return True
+    return any(name.startswith(f"{prefix}_") for prefix in prefixes)
+
+
+def load_target_variant_ids(
+    root: Path,
+    patterns_dir: Path,
+    cov: int,
+    error_type: str,
+    caller: str,
+    pattern_prefixes: set[str],
+) -> set[str]:
+    patt_dir = (root / patterns_dir).resolve()
+    caller_alias = CALLER_TO_ALIAS.get(caller, "")
+    error_suffix = "_fn" if error_type.upper() == "FN" else "_fp"
+
+    if not patt_dir.exists():
+        print(f"  [WARN] patterns dir not found: {patt_dir}")
+        return set()
+
+    out: set[str] = set()
+    files = [p for p in sorted(patt_dir.glob(f"*_{cov}x.tsv")) if pattern_matches(p.stem, pattern_prefixes)]
+
+    for path in files:
+        try:
+            df = pd.read_csv(path, sep="\t")
+        except Exception as exc:
+            print(f"  [WARN] Skip unreadable pattern file {path.name}: {exc}")
+            continue
+        if df.empty or "variant_id" not in df.columns:
+            continue
+
+        if "pattern" in df.columns:
+            df = df[df["pattern"].astype(str).str.endswith(error_suffix)]
+            if pattern_prefixes:
+                df = df[
+                    df["pattern"].astype(str).map(lambda x: pattern_matches(x, pattern_prefixes))
+                ]
+        elif not path.stem.endswith(error_suffix):
+            continue
+
+        if df.empty:
+            continue
+
+        # all_5 contributes to all callers; single_caller uses focus_caller; dv_ds applies only DV/DS.
+        stem = path.stem
+        if stem.startswith("single_caller_") or (
+            "pattern" in df.columns
+            and bool(df["pattern"].astype(str).str.startswith("single_caller_").any())
+        ):
+            if "focus_caller" not in df.columns or not caller_alias:
+                continue
+            df = df[df["focus_caller"].astype(str) == caller_alias]
+        elif stem.startswith("dv_ds_") or (
+            "pattern" in df.columns
+            and bool(df["pattern"].astype(str).str.startswith("dv_ds_").any())
+        ):
+            if caller_alias not in {"DV", "DS"}:
+                continue
+
+        if df.empty:
+            continue
+
+        out.update(df["variant_id"].astype(str).map(normalize_variant_id).tolist())
+
+    return out
 
 
 def load_vcf_rows(path: Path, caller: str, error_type: str) -> pd.DataFrame:
@@ -123,6 +227,23 @@ def score_one(args: argparse.Namespace, caller: str, error_type: str,
     print(f"Loading {caller} {error_type} @ {cov}x from {vcf_path} …")
     metadata = load_vcf_rows(vcf_path, caller, error_type)
     print(f"  Variants loaded: {len(metadata)}")
+
+    prefixes = parse_pattern_prefixes(args.pattern_prefixes)
+    if prefixes:
+        target_ids = load_target_variant_ids(
+            root=root,
+            patterns_dir=args.patterns_dir,
+            cov=cov,
+            error_type=error_type,
+            caller=caller,
+            pattern_prefixes=prefixes,
+        )
+        print(f"  Target variants from patterns: {len(target_ids)}")
+        if not target_ids:
+            print("  No target variants for this caller/cov/error_type — skipping.")
+            return
+        metadata = metadata[metadata["variant_id"].map(normalize_variant_id).isin(target_ids)].copy()
+        print(f"  Variants after pattern filter: {len(metadata)}")
 
     if metadata.empty:
         print("  No variants found — nothing to score.")
