@@ -282,6 +282,50 @@ if (nrow(by_cds) > 0) {
 }
 
 # =============================================================================
+# PLOT 5: F1 Comparison in CDS Regions (Overall vs. All CDS vs. Canonical CDS)
+# =============================================================================
+
+cat("\n--- Plot 5: F1 Comparison in CDS Regions ---\n")
+
+cds_comp <- bdata %>%
+  filter(Filter == "PASS", Subtype == "*") %>%
+  filter(Subset %in% c("*", "", "proteincoding_only", "CDS_canonical")) %>%
+  mutate(SubsetLabel = case_when(
+    Subset == "*" | Subset == "" ~ "Overall",
+    Subset == "proteincoding_only" ~ "All Protein Coding CDS",
+    Subset == "CDS_canonical" ~ "Canonical CDS",
+    TRUE ~ "Other"
+  ))
+
+cds_comp$SubsetLabel <- factor(cds_comp$SubsetLabel, levels = c("Overall", "All Protein Coding CDS", "Canonical CDS"))
+
+if (nrow(cds_comp) > 0) {
+  for (vtype in c("SNP", "INDEL")) {
+    sub_df <- cds_comp %>% filter(Type == vtype)
+    if (nrow(sub_df) == 0) next
+
+    p <- ggplot(sub_df, aes(x = SubsetLabel, y = F1, fill = Caller)) +
+      geom_boxplot(position = position_dodge(0.8), width = 0.7, alpha = 0.85, outlier.size = 1) +
+      scale_fill_manual(values = caller_colors) +
+      scale_y_continuous(limits = c(max(0, min(sub_df$F1, na.rm = TRUE) - 0.05), 1)) +
+      labs(title = paste("F1 Score in CDS Regions (Across All Coverages) —", vtype),
+           x = "Genomic Region", y = "F1 Score") +
+      theme_bw(base_size = 13) +
+      theme(panel.grid.minor = element_blank(),
+            plot.title = element_text(hjust = 0.5, face = "bold"),
+            legend.position = "bottom",
+            axis.text.x = element_text(angle = 15, hjust = 1, face = "bold"))
+
+    fname <- paste0("boxplot_f1_cds_comparison_", tolower(vtype))
+    ggsave(file.path(output_dir, paste0(fname, ".pdf")), p, width = 9, height = 6)
+    ggsave(file.path(output_dir, paste0(fname, ".png")), p, width = 9, height = 6, dpi = 150)
+    cat("  Saved:", fname, "\n")
+  }
+} else {
+  cat("  SKIP: No CDS stratification data found for comparison\n")
+}
+
+# =============================================================================
 # COMBINED FIGURE: Stratification Panel
 # =============================================================================
 

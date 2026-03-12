@@ -59,6 +59,21 @@ else
     echo "  Already exists: ${CDS_BED}"
 fi
 
+# Extract canonical protein-coding CDS on chr22 only
+CDS_CANONICAL_BED="${STRAT_DIR}/CDS-canonical.${CHR_TO_USE}.bed"
+if [[ ! -f "${CDS_CANONICAL_BED}" ]]; then
+    echo "  Extracting canonical protein-coding CDS for ${CHR_TO_USE}..."
+    zcat "${GENCODE_GTF}" \
+        | awk -v chr="${CHR_TO_USE}" '$1 == chr && $3 == "CDS" && $0 ~ /gene_type "protein_coding"/ && $0 ~ /tag "Ensembl_canonical"/' \
+        | awk 'BEGIN{OFS="\t"} {print $1, $4-1, $5}' \
+        | sort -k1,1 -k2,2n \
+        | bedtools merge -i - \
+        > "${CDS_CANONICAL_BED}"
+    echo "  Created: ${CDS_CANONICAL_BED} ($(wc -l < "${CDS_CANONICAL_BED}") intervals)"
+else
+    echo "  Already exists: ${CDS_CANONICAL_BED}"
+fi
+
 # Generate CDS vicinity (padding) BED files
 for PAD in 0 25 50 100; do
     VICINITY_BED="${STRAT_DIR}/${CHR_TO_USE}_cds_vicinity_${PAD}bp.bed"
@@ -192,6 +207,7 @@ STRAT_TSV="${REF_DIR}/stratification_chr22.tsv"
 
 # CDS and vicinity
 echo "proteincoding_only	stratification/${CHR_TO_USE}_proteincoding_only.bed" >> "${STRAT_TSV}"
+echo "CDS_canonical	stratification/CDS-canonical.${CHR_TO_USE}.bed" >> "${STRAT_TSV}"
 for PAD in 0 25 50 100; do
     echo "cds_vicinity_${PAD}bp	stratification/${CHR_TO_USE}_cds_vicinity_${PAD}bp.bed" >> "${STRAT_TSV}"
 done
