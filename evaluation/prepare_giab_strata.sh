@@ -43,7 +43,7 @@ download_and_filter() {
 
     local TMP="${OUT}.tmp.gz"
     echo "  Downloading ${LABEL}..."
-    wget -q -O "${TMP}" "${URL}" || { echo "  ERROR: Download failed for ${LABEL}"; rm -f "${TMP}"; return 1; }
+    wget -q --tries=3 --timeout=60 -O "${TMP}" "${URL}" || { echo "  ERROR: Download failed for ${LABEL} (URL: ${URL})"; rm -f "${TMP}"; return 1; }
 
     echo "  Filtering for ${CHR_TO_USE}..."
     zcat "${TMP}" \
@@ -67,10 +67,15 @@ download_and_filter() {
 
 echo ""
 echo "--- 1. Tandem Repeats + Homopolymers ---"
+# NOTE: In GIAB v3.3, this file may be split. Try primary name first, then fallback.
 download_and_filter \
     "${GIAB_BASE}/LowComplexity/GRCh38_AllTandemRepeatsandHomopolymers_slop5.bed.gz" \
     "${REPEATS_DIR}/tandem_repeat_homopolymer.bed" \
-    "AllTandemRepeatsandHomopolymers"
+    "AllTandemRepeatsandHomopolymers" \
+|| download_and_filter \
+    "${GIAB_BASE}/LowComplexity/GRCh38_AllTandemRepeats_slop5.bed.gz" \
+    "${REPEATS_DIR}/tandem_repeat_homopolymer.bed" \
+    "AllTandemRepeats (v3.3 fallback)"
 
 # =============================================================================
 # 2) Low Mappability (all)
